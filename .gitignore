@@ -1,0 +1,6 @@
+node_modules/
+.clasp.json
+.env
+src/setup.gs
+.DS_Store
+src/.DS_Store
