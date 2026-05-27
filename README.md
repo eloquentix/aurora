@@ -1,8 +1,8 @@
-# MoneyPenny
+# PennyBrief
 
 **Your AI-powered morning email briefing.** Deploy in 5 minutes, runs entirely in Google Apps Script — no server, no infrastructure, no ongoing maintenance.
 
-Every morning, MoneyPenny reads your Gmail inbox, analyzes each email with an AI model of your choice, and delivers a structured briefing: summaries, action items with direct Gmail links, and one-click proposed replies.
+Every morning, PennyBrief reads your Gmail inbox, analyzes each email with an AI model of your choice, and delivers a structured briefing: summaries, action items with direct Gmail links, and one-click proposed replies.
 
 Built by [Eloquentix](https://eloquentix.com) as an open-source demonstration of practical AI agents — simple enough to understand in an afternoon, useful enough to run every day.
 
@@ -34,7 +34,7 @@ A daily email that looks like this:
 
 ## How it works
 
-MoneyPenny is a small AI agent:
+PennyBrief is a small AI agent:
 
 1. **Reads** your Gmail inbox (last 20 hours)
 2. **Analyzes** each email — summary, action items, proposed reply
@@ -77,7 +77,7 @@ Pick one — or switch anytime by changing a single config value.
 ### 1. Clone and install clasp
 
 ```bash
-git clone https://github.com/eloquentix/moneypenny.git
+git clone https://github.com/eloquentix/pennybrief.git
 cd moneypenny
 npm install -g @google/clasp
 clasp login
@@ -92,7 +92,7 @@ Visit [script.google.com/home/usersettings](https://script.google.com/home/users
 ### 3. Create the Apps Script project
 
 ```bash
-clasp create --type standalone --title "MoneyPenny"
+clasp create --type standalone --title "PennyBrief"
 clasp push
 ```
 
@@ -120,7 +120,7 @@ Then push and run the setup:
 clasp push
 ```
 
-Go to [script.google.com](https://script.google.com), open **MoneyPenny**, click `src/setup.gs` in the left sidebar, select `setupProperties` from the function dropdown, click **Run**, and accept the permissions prompt.
+Go to [script.google.com](https://script.google.com), open **PennyBrief**, click `src/setup.gs` in the left sidebar, select `setupProperties` from the function dropdown, click **Run**, and accept the permissions prompt.
 
 This stores your keys securely in Google's Script Properties. You never need to do it again unless keys change. `setup.gs` is gitignored — your keys stay local.
 
@@ -130,7 +130,7 @@ In the Apps Script editor, switch to `src/main.gs`, select `testBriefing`, and c
 
 ### 6. Go live
 
-Select `installTrigger` and click **Run**. MoneyPenny will send your briefing every morning at 7 AM.
+Select `installTrigger` and click **Run**. PennyBrief will send your briefing every morning at 7 AM.
 
 ---
 
@@ -146,11 +146,11 @@ Edit `src/config.gs` or set Script Properties to override without touching code.
 | `MAX_EMAILS` | `50` | Cap per run (controls cost) |
 | `BRIEFING_HOUR` | `7` | Hour to send the briefing (0–23) |
 | `PRIORITY_CONTACTS` | *(empty)* | Comma-separated emails to highlight at the top |
-| `PERSONA_NAME` | `MoneyPenny` | Agent name in email subject and footer |
+| `PERSONA_NAME` | `PennyBrief` | Agent name in email subject and footer |
 
 ---
 
-## Extending MoneyPenny
+## Extending PennyBrief
 
 The codebase is intentionally small and readable. Key extension points:
 

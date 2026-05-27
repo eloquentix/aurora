@@ -29,7 +29,7 @@ function setupProperties() {
     // 'MAX_EMAILS':        '50',
     // 'BRIEFING_HOUR':     '7',
     // 'PRIORITY_CONTACTS': 'alice@company.com,bob@startup.io',
-    // 'PERSONA_NAME':      'MoneyPenny',
+    // 'PERSONA_NAME':      'PennyBrief',
 
   });
 
