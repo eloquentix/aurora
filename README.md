@@ -85,8 +85,8 @@ Once copied, follow these steps:
 #### Step 1 — Get a free Gemini API key
 
 1. Go to [aistudio.google.com](https://aistudio.google.com) and sign in with your Google account
-2. Click **"Create API key"** on the left sidebar
-3. Click **"Create API key in new project"**
+2. Click **"Get API key"** on the left sidebar
+3. Click **"Create API key"** on the right side
 4. Copy the key that appears
 
 ---

@@ -86,8 +86,8 @@ function buildGmailUrl(threadId) {
  */
 function buildMailtoLink(toEmail, subject, body) {
   var safeBody = truncate(body || '', 1500);
-  return 'mailto:' +
-    encodeURIComponent(toEmail) +
+  // toEmail must NOT be encoded — encoding @ as %40 breaks the To: field in Gmail
+  return 'mailto:' + toEmail +
     '?subject=' + encodeURIComponent(subject) +
     '&body=' + encodeURIComponent(safeBody);
 }

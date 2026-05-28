@@ -4,7 +4,8 @@
  * ╠══════════════════════════════════════════════════════════╣
  * ║  1. Get a FREE Gemini key:                                ║
  * ║     → Go to https://aistudio.google.com                  ║
- * ║     → Click "Create API key" on the left                 ║
+ * ║     → Click "Get API key" on the left, then               ║
+ * ║       "Create API key" on the right                       ║
  * ║     → Copy the key and paste it below                    ║
  * ║                                                          ║
  * ║  2. Click the ▶ Run button above                         ║
