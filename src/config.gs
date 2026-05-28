@@ -26,7 +26,7 @@ var CONFIG = {
   MAX_EMAILS: 40,
 
   // Maximum characters of email body to send to the AI
-  MAX_BODY_CHARS: 800,
+  MAX_BODY_CHARS: 2000,
 
   // Email addresses to treat as high-priority (replies from people you've reached out to)
   // e.g. ['colleague@company.com', 'client@startup.io']
