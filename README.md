@@ -78,11 +78,25 @@ Pick one — or switch anytime by changing a single config value.
 
 Once copied:
 
+**Step 1 — Get a free Gemini API key**
+1. Go to [aistudio.google.com](https://aistudio.google.com) and sign in with your Google account
+2. Click **"Create API key"** on the left
+3. Click **"Create API key in new project"**
+4. Copy the key that appears
+
+**Step 2 — Add your key**
 1. Click `src/setup.gs` in the left sidebar
-2. Replace `PASTE_YOUR_GEMINI_KEY_HERE` with your key — [get one free here](https://aistudio.google.com) (30 seconds)
-3. Select `setupProperties` in the dropdown → click **▶ Run**
-4. Google will ask for permissions — approve everything. If you see **"Google hasn't verified this app"**, click **Advanced** → **"Go to Aurora (unsafe)"** → **Allow**. This is normal for personal scripts.
-5. Switch to `src/main.gs`, select `installTrigger` → click **▶ Run** (approve permissions again if asked)
+2. Replace `PASTE_YOUR_GEMINI_KEY_HERE` with the key you just copied
+3. Select `setupProperties` in the function dropdown → click **▶ Run**
+4. Google will ask for permissions — approve everything. If you see **"Google hasn't verified this app"**, click **Advanced** → **"Go to Aurora (unsafe)"** → **Allow**. This is normal for personal scripts and completely safe.
+
+**Step 3 — Test it (optional but recommended)**
+1. Switch to `src/main.gs` in the left sidebar
+2. Select `testBriefing` in the dropdown → click **▶ Run**
+3. Click **"Execution log"** to see Aurora analyzing your emails — no email is sent during the test
+
+**Step 4 — Go live**
+1. Select `installTrigger` in the dropdown → click **▶ Run** (approve permissions again if asked)
 
 That's it. Your briefing arrives tomorrow morning.
 
