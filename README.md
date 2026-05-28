@@ -71,9 +71,12 @@ Pick one — or switch anytime by changing a single config value.
 
 ### Easiest way — no terminal required
 
-**[→ Click here to make your own copy](https://script.google.com/d/1AvnG6Nxl91yDswW56MkY9tegHDS3saJkzmlfpxQasLmhAwaObM_MkIRR/copy)**
+**[→ Open Aurora in Google Apps Script](https://script.google.com/d/1AvnG6Nxl91yDswW56MkY9tegHDS3saJkzmlfpxQasLmhAwaObM_MkIRR/edit?usp=sharing)**
 
-Once it opens in your Google account:
+1. Click the **ⓘ** icon on the left sidebar
+2. Click the **copy** icon on the right — this saves a copy to your Google account
+
+Once copied:
 
 1. Click `src/setup.gs` in the left sidebar
 2. Replace `PASTE_YOUR_GEMINI_KEY_HERE` with your key — [get one free here](https://aistudio.google.com) (30 seconds)
