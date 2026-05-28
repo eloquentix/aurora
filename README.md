@@ -75,6 +75,8 @@ Pick one — or switch anytime by changing a single config value.
 
 1. Click the **ⓘ** icon on the left sidebar
 2. Click the **copy** icon on the right — this saves a copy to your Google account
+3. Google will open your copy automatically in a new tab — **bookmark it or keep the tab open**
+   > If you lose it, go to [script.google.com](https://script.google.com) and look for **"Copy of Aurora"** in your projects list
 
 Once copied, follow these steps:
 
