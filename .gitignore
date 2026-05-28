@@ -1,5 +1,6 @@
 node_modules/
 .clasp.json
 .env
+keys.env
 .DS_Store
 src/.DS_Store
