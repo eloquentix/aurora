@@ -46,5 +46,6 @@ function setupProperties() {
   });
 
   Logger.log('✓ API key saved. Provider: gemini');
-  Logger.log('Next: open src/main.gs and run installTrigger()');
+  Logger.log('Next: open src/main.gs → run testBriefing() to preview your first briefing');
+  Logger.log('Then: run installTrigger() to go live every morning');
 }
