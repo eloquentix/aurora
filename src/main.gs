@@ -4,7 +4,7 @@
  * Run these functions from the Apps Script editor or via clasp:
  *
  *   runBriefing()    — fetch, analyze, and send the briefing email
- *   testBriefing()   — same but last 4 hours, logs output instead of sending
+ *   testBriefing()   — last 4 hours, max 5 emails, sends a real email so you can preview it
  *   installTrigger() — set up daily 7 AM trigger
  *   removeTrigger()  — remove all project triggers
  */
