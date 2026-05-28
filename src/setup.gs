@@ -1,0 +1,45 @@
+/**
+ * ╔══════════════════════════════════════════════════════════╗
+ * ║            PENNYBRIEF SETUP — STEP 1 OF 2               ║
+ * ╠══════════════════════════════════════════════════════════╣
+ * ║  1. Paste your Gemini API key below (it's FREE)          ║
+ * ║     Get one at: https://aistudio.google.com              ║
+ * ║                                                          ║
+ * ║  2. Click the ▶ Run button above                         ║
+ * ║     Make sure "setupProperties" is selected              ║
+ * ║                                                          ║
+ * ║  3. Accept the permissions prompt                        ║
+ * ║                                                          ║
+ * ║  Then go to src/main.gs and run installTrigger()         ║
+ * ╚══════════════════════════════════════════════════════════╝
+ */
+
+function setupProperties() {
+
+  // ─── PASTE YOUR KEY HERE ──────────────────────────────────────────────────
+  var GEMINI_KEY = 'PASTE_YOUR_GEMINI_KEY_HERE'; // free at https://aistudio.google.com
+  // ─────────────────────────────────────────────────────────────────────────
+
+  PropertiesService.getScriptProperties().setProperties({
+    'AI_PROVIDER':    'gemini',
+    'GEMINI_API_KEY': GEMINI_KEY,
+
+    // Using a different provider? Comment out the two lines above and
+    // uncomment one of the blocks below:
+
+    // --- Claude (Anthropic) ---
+    // 'AI_PROVIDER':    'claude',
+    // 'CLAUDE_API_KEY': 'PASTE_YOUR_CLAUDE_KEY_HERE',  // console.anthropic.com
+
+    // --- OpenAI ---
+    // 'AI_PROVIDER':    'openai',
+    // 'OPENAI_API_KEY': 'PASTE_YOUR_OPENAI_KEY_HERE',  // platform.openai.com
+
+    // --- Grok (xAI) ---
+    // 'AI_PROVIDER':    'grok',
+    // 'GROK_API_KEY':   'PASTE_YOUR_GROK_KEY_HERE',    // console.x.ai
+  });
+
+  Logger.log('✓ API key saved. Provider: gemini');
+  Logger.log('Next: open src/main.gs and run installTrigger()');
+}

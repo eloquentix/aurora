@@ -67,70 +67,68 @@ Pick one — or switch anytime by changing a single config value.
 
 ---
 
-## Deploy in 5 minutes
+## Get started
 
-### Prerequisites
+### Easiest way — no terminal required
+
+**[→ Click here to make your own copy](https://script.google.com/d/1AvnG6Nxl91yDswW56MkY9tegHDS3saJkzmlfpxQasLmhAwaObM_MkIRR/copy)**
+
+Once it opens in your Google account:
+
+1. Click `src/setup.gs` in the left sidebar
+2. Replace `PASTE_YOUR_GEMINI_KEY_HERE` with your key — [get one free here](https://aistudio.google.com) (30 seconds)
+3. Select `setupProperties` in the dropdown → click **▶ Run** → accept the permissions prompt
+4. Switch to `src/main.gs`, select `installTrigger` → click **▶ Run**
+
+That's it. Your briefing arrives tomorrow morning.
+
+---
+
+### Developer way — clasp + git
+
+If you want to run your own copy of the code, extend it, or contribute:
+
+#### Prerequisites
 - A Google account (Gmail)
 - [Node.js](https://nodejs.org) installed
-- An API key from any provider above (Gemini has a free tier)
+- An API key from any provider (Gemini has a free tier)
 
-### 1. Clone and install clasp
+#### 1. Clone and install clasp
 
 ```bash
 git clone https://github.com/eloquentix/pennybrief.git
-cd moneypenny
+cd pennybrief
 npm install -g @google/clasp
 clasp login
 ```
 
-`clasp login` opens a browser — sign in with the Google account whose Gmail you want to read.
+#### 2. Enable the Apps Script API
 
-### 2. Enable the Apps Script API
+Visit [script.google.com/home/usersettings](https://script.google.com/home/usersettings) and turn on **Google Apps Script API**.
 
-Visit [script.google.com/home/usersettings](https://script.google.com/home/usersettings) and turn on **Google Apps Script API**. Required once per Google account.
-
-### 3. Create the Apps Script project
+#### 3. Create and push
 
 ```bash
 clasp create --type standalone --title "PennyBrief"
 clasp push
 ```
 
-When asked to overwrite the manifest — answer **Yes**.
+Answer **Yes** when asked to overwrite the manifest.
 
-### 4. Add your API keys
+#### 4. Add your API key
 
-```bash
-cp src/setup.example.gs src/setup.gs
-```
-
-Open `src/setup.gs` and fill in your keys:
-
-```javascript
-'AI_PROVIDER':    'gemini',          // start here — it's free
-'CLAUDE_API_KEY': '',
-'OPENAI_API_KEY': '',
-'GEMINI_API_KEY': 'AIza...',         // free at aistudio.google.com
-'GROK_API_KEY':   '',
-```
-
-Then push and run the setup:
+Open `src/setup.gs`, paste your key, then:
 
 ```bash
 clasp push
 ```
 
-Go to [script.google.com](https://script.google.com), open **PennyBrief**, click `src/setup.gs` in the left sidebar, select `setupProperties` from the function dropdown, click **Run**, and accept the permissions prompt.
+Go to [script.google.com](https://script.google.com), open **PennyBrief**, click `src/setup.gs`, select `setupProperties` → **Run**.
 
-This stores your keys securely in Google's Script Properties. You never need to do it again unless keys change. `setup.gs` is gitignored — your keys stay local.
+#### 5. Test and go live
 
-### 5. Test it
-
-In the Apps Script editor, switch to `src/main.gs`, select `testBriefing`, and click **Run**. The Execution Log shows the full analysis without sending any email.
-
-### 6. Go live
-
-Select `installTrigger` and click **Run**. PennyBrief will send your briefing every morning at 7 AM.
+- Run `testBriefing()` — check Execution Log, no email sent
+- Run `installTrigger()` — briefing arrives every morning at 7 AM
 
 ---
 
