@@ -2,8 +2,10 @@
  * ╔══════════════════════════════════════════════════════════╗
  * ║            PENNYBRIEF SETUP — STEP 1 OF 2               ║
  * ╠══════════════════════════════════════════════════════════╣
- * ║  1. Paste your Gemini API key below (it's FREE)          ║
- * ║     Get one at: https://aistudio.google.com              ║
+ * ║  1. Get a FREE Gemini key:                                ║
+ * ║     → Go to https://aistudio.google.com                  ║
+ * ║     → Click "Create API key" on the left                 ║
+ * ║     → Copy the key and paste it below                    ║
  * ║                                                          ║
  * ║  2. Click the ▶ Run button above                         ║
  * ║     Make sure "setupProperties" is selected              ║
