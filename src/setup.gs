@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════╗
- * ║            PENNYBRIEF SETUP — STEP 1 OF 2               ║
+ * ║              AURORA SETUP — STEP 1 OF 2                  ║
  * ╠══════════════════════════════════════════════════════════╣
  * ║  1. Get a FREE Gemini key:                                ║
  * ║     → Go to https://aistudio.google.com                  ║
