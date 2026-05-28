@@ -68,8 +68,9 @@ function runBriefing() {
 }
 
 /**
- * Test mode: runs the pipeline for the last 4 hours, logs HTML output
- * to the Execution Log instead of sending an email. Safe to run any time.
+ * Test mode: runs the pipeline on the last 4 hours (max 5 emails) and
+ * sends a real briefing email so you can see exactly what it looks like.
+ * Check your inbox and the Execution Log after running.
  */
 function testBriefing() {
   var errors = validateConfig();
@@ -78,7 +79,7 @@ function testBriefing() {
   }
 
   var cfg = getConfig();
-  Logger.log('=== TEST MODE: scanning last 4 hours ===');
+  Logger.log('=== TEST MODE: scanning last 4 hours, max 5 emails ===');
 
   var emails = fetchRecentEmails(4, 5); // small cap — keeps test fast and avoids rate limits
   Logger.log('Found ' + emails.length + ' emails');
@@ -91,16 +92,10 @@ function testBriefing() {
   }
 
   var summary = generateOverallSummary(analyses);
-  Logger.log('\n--- OVERALL SUMMARY ---\n' + summary);
+  Logger.log('Overall summary: ' + summary);
 
-  analyses.forEach(function(a) {
-    Logger.log('\n--- ' + a.email.subject + ' ---');
-    Logger.log('Summary: ' + a.summary);
-    Logger.log('Actions: ' + JSON.stringify(a.actionItems));
-    Logger.log('Proposed reply: ' + (a.proposedReply || 'none'));
-  });
-
-  Logger.log('\n=== TEST COMPLETE ===');
+  sendBriefingEmail(summary, analyses, cfg);
+  Logger.log('=== TEST COMPLETE — check your inbox! ===');
 }
 
 /**

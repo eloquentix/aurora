@@ -103,8 +103,8 @@ Once copied, follow these steps:
 
 1. Click `src/main.gs` in the left sidebar
 2. Select `testBriefing` in the dropdown → click **▶ Run**
-3. Click **"Execution log"** to see Aurora analyzing your emails
-   > No email is sent during a test run — it's safe to run any time.
+3. Watch the **Execution log** as Aurora analyzes your last 5 emails
+4. Check your inbox — a real briefing email will arrive so you can see exactly what it looks like
 
 ---
 
