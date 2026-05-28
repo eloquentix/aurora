@@ -50,9 +50,10 @@ function runBriefing() {
     analyses.push(analysis);
     Logger.log('Analyzed (' + (i + 1) + '/' + allEmails.length + '): ' + allEmails[i].subject);
 
-    // Small delay between calls to avoid rate limiting
+    // Delay between calls to respect provider rate limits.
+    // Gemini free tier: 10 req/min — we use 6.5s to stay safely under.
     if (i < allEmails.length - 1) {
-      Utilities.sleep(300);
+      Utilities.sleep(getCallDelay());
     }
   }
 
@@ -79,14 +80,14 @@ function testBriefing() {
   var cfg = getConfig();
   Logger.log('=== TEST MODE: scanning last 4 hours ===');
 
-  var emails = fetchRecentEmails(4, 10); // smaller cap for testing
+  var emails = fetchRecentEmails(4, 5); // small cap — keeps test fast and avoids rate limits
   Logger.log('Found ' + emails.length + ' emails');
 
   var analyses = [];
   for (var i = 0; i < emails.length; i++) {
     Logger.log('Analyzing: ' + emails[i].subject);
     analyses.push(analyzeEmail(emails[i]));
-    if (i < emails.length - 1) Utilities.sleep(300);
+    if (i < emails.length - 1) Utilities.sleep(getCallDelay());
   }
 
   var summary = generateOverallSummary(analyses);

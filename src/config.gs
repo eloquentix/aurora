@@ -21,6 +21,8 @@ var CONFIG = {
   HOURS_BACK: 20,
 
   // Maximum number of emails to process (prevents runaway API costs)
+  // Gemini free tier: 10 req/min — at 6s delay, 25 emails takes ~2.5 min (safe)
+  // Paid providers (Claude, OpenAI, Grok): 50 is fine
   MAX_EMAILS: 50,
 
   // Maximum characters of email body to send to the AI
@@ -114,6 +116,17 @@ function getApiKey() {
  */
 function getProvider() {
   return getConfig().AI_PROVIDER;
+}
+
+/**
+ * Returns the delay in ms to wait between AI calls.
+ * Gemini free tier: 10 RPM = one call every 6 seconds minimum.
+ * Paid providers have much higher limits — 400ms is a safe courtesy delay.
+ */
+function getCallDelay() {
+  var provider = getProvider();
+  if (provider === 'gemini') return 6500; // ~9 RPM — safely under the 10 RPM free limit
+  return 400;
 }
 
 /**
