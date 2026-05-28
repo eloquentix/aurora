@@ -23,7 +23,7 @@ var CONFIG = {
   // Maximum number of emails to process (prevents runaway API costs)
   // Gemini free tier: 10 req/min — at 6s delay, 25 emails takes ~2.5 min (safe)
   // Paid providers (Claude, OpenAI, Grok): 50 is fine
-  MAX_EMAILS: 50,
+  MAX_EMAILS: 40,
 
   // Maximum characters of email body to send to the AI
   MAX_BODY_CHARS: 800,
