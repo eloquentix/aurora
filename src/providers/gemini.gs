@@ -3,7 +3,10 @@
  *
  * API docs: https://ai.google.dev/api/generate-content
  * Uses API key auth (no OAuth required).
- * Default model: gemini-2.0-flash (fast, has a generous free tier)
+ * Default model: gemini-2.5-flash
+ *
+ * Free tier limits: ~10 RPM, low daily quota.
+ * Retries automatically on 429 (rate limit) and 503 (overload).
  */
 
 var GEMINI_DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -36,20 +39,34 @@ function callGemini(apiKey, prompt, opts, modelOverride) {
     };
   }
 
-  var response = UrlFetchApp.fetch(url, {
+  var fetchOpts = {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
-  });
+  };
 
-  var code = response.getResponseCode();
-  var body = response.getContentText();
+  // Retry up to 3 times on 429 (rate limit) and 503 (overload)
+  // Delays: 15s → 30s → 60s
+  var retryDelays = [15000, 30000, 60000];
 
-  if (code !== 200) {
+  for (var attempt = 0; attempt <= retryDelays.length; attempt++) {
+    var response = UrlFetchApp.fetch(url, fetchOpts);
+    var code = response.getResponseCode();
+    var body = response.getContentText();
+
+    if (code === 200) {
+      var data = JSON.parse(body);
+      return data.candidates[0].content.parts[0].text;
+    }
+
+    if ((code === 429 || code === 503) && attempt < retryDelays.length) {
+      var delay = retryDelays[attempt];
+      Logger.log('Gemini ' + code + ' — waiting ' + (delay / 1000) + 's before retry ' + (attempt + 1) + '...');
+      Utilities.sleep(delay);
+      continue;
+    }
+
     throw new Error('AI API error (gemini): HTTP ' + code + ' — ' + truncate(body, 200));
   }
-
-  var data = JSON.parse(body);
-  return data.candidates[0].content.parts[0].text;
 }

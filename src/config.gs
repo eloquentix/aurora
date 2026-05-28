@@ -125,7 +125,7 @@ function getProvider() {
  */
 function getCallDelay() {
   var provider = getProvider();
-  if (provider === 'gemini') return 6500; // ~9 RPM — safely under the 10 RPM free limit
+  if (provider === 'gemini') return 8000; // ~7.5 RPM — comfortably under the 10 RPM free limit
   return 400;
 }
 
