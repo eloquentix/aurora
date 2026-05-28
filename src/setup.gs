@@ -10,7 +10,10 @@
  * ║  2. Click the ▶ Run button above                         ║
  * ║     Make sure "setupProperties" is selected              ║
  * ║                                                          ║
- * ║  3. Accept the permissions prompt                        ║
+ * ║  3. Google will ask for permissions — approve ALL of     ║
+ * ║     them. If you see "Google hasn't verified this app",  ║
+ * ║     click "Advanced" → "Go to Aurora (unsafe)" →        ║
+ * ║     "Allow". This is normal for personal scripts.        ║
  * ║                                                          ║
  * ║  Then go to src/main.gs and run installTrigger()         ║
  * ╚══════════════════════════════════════════════════════════╝

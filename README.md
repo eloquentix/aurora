@@ -80,8 +80,9 @@ Once copied:
 
 1. Click `src/setup.gs` in the left sidebar
 2. Replace `PASTE_YOUR_GEMINI_KEY_HERE` with your key — [get one free here](https://aistudio.google.com) (30 seconds)
-3. Select `setupProperties` in the dropdown → click **▶ Run** → accept the permissions prompt
-4. Switch to `src/main.gs`, select `installTrigger` → click **▶ Run**
+3. Select `setupProperties` in the dropdown → click **▶ Run**
+4. Google will ask for permissions — approve everything. If you see **"Google hasn't verified this app"**, click **Advanced** → **"Go to Aurora (unsafe)"** → **Allow**. This is normal for personal scripts.
+5. Switch to `src/main.gs`, select `installTrigger` → click **▶ Run** (approve permissions again if asked)
 
 That's it. Your briefing arrives tomorrow morning.
 
