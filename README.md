@@ -1,8 +1,8 @@
-# PennyBrief
+# Aurora
 
 **Your AI-powered morning email briefing.** Deploy in 5 minutes, runs entirely in Google Apps Script — no server, no infrastructure, no ongoing maintenance.
 
-Every morning, PennyBrief reads your Gmail inbox, analyzes each email with an AI model of your choice, and delivers a structured briefing: summaries, action items with direct Gmail links, and one-click proposed replies.
+Every morning, Aurora reads your Gmail inbox, analyzes each email with an AI model of your choice, and delivers a structured briefing: summaries, action items with direct Gmail links, and one-click proposed replies.
 
 Built by [Eloquentix](https://eloquentix.com) as an open-source demonstration of practical AI agents — simple enough to understand in an afternoon, useful enough to run every day.
 
@@ -34,7 +34,7 @@ A daily email that looks like this:
 
 ## How it works
 
-PennyBrief is a small AI agent:
+Aurora is a small AI agent:
 
 1. **Reads** your Gmail inbox (last 20 hours)
 2. **Analyzes** each email — summary, action items, proposed reply
@@ -96,8 +96,8 @@ If you want to run your own copy of the code, extend it, or contribute:
 #### 1. Clone and install clasp
 
 ```bash
-git clone https://github.com/eloquentix/pennybrief.git
-cd pennybrief
+git clone https://github.com/eloquentix/aurora.git
+cd aurora
 npm install -g @google/clasp
 clasp login
 ```
@@ -109,7 +109,7 @@ Visit [script.google.com/home/usersettings](https://script.google.com/home/users
 #### 3. Create and push
 
 ```bash
-clasp create --type standalone --title "PennyBrief"
+clasp create --type standalone --title "Aurora"
 clasp push
 ```
 
@@ -123,7 +123,7 @@ Open `src/setup.gs`, paste your key, then:
 clasp push
 ```
 
-Go to [script.google.com](https://script.google.com), open **PennyBrief**, click `src/setup.gs`, select `setupProperties` → **Run**.
+Go to [script.google.com](https://script.google.com), open **Aurora**, click `src/setup.gs`, select `setupProperties` → **Run**.
 
 #### 5. Test and go live
 
@@ -144,11 +144,11 @@ Edit `src/config.gs` or set Script Properties to override without touching code.
 | `MAX_EMAILS` | `50` | Cap per run (controls cost) |
 | `BRIEFING_HOUR` | `7` | Hour to send the briefing (0–23) |
 | `PRIORITY_CONTACTS` | *(empty)* | Comma-separated emails to highlight at the top |
-| `PERSONA_NAME` | `PennyBrief` | Agent name in email subject and footer |
+| `PERSONA_NAME` | `Aurora` | Agent name in email subject and footer |
 
 ---
 
-## Extending PennyBrief
+## Extending Aurora
 
 The codebase is intentionally small and readable. Key extension points:
 

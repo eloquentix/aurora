@@ -17,11 +17,11 @@ function runBriefing() {
   // 1. Validate config — fail fast with a clear error
   var errors = validateConfig();
   if (errors.length > 0) {
-    throw new Error('PennyBrief config errors:\n' + errors.join('\n'));
+    throw new Error('Aurora config errors:\n' + errors.join('\n'));
   }
 
   var cfg = getConfig();
-  Logger.log('PennyBrief starting. Provider: ' + cfg.AI_PROVIDER + ', scanning last ' + cfg.HOURS_BACK + 'h');
+  Logger.log('Aurora starting. Provider: ' + cfg.AI_PROVIDER + ', scanning last ' + cfg.HOURS_BACK + 'h');
 
   // 2. Fetch recent emails
   var emails = fetchRecentEmails(cfg.HOURS_BACK, cfg.MAX_EMAILS);
@@ -73,7 +73,7 @@ function runBriefing() {
 function testBriefing() {
   var errors = validateConfig();
   if (errors.length > 0) {
-    throw new Error('PennyBrief config errors:\n' + errors.join('\n'));
+    throw new Error('Aurora config errors:\n' + errors.join('\n'));
   }
 
   var cfg = getConfig();

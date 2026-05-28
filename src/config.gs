@@ -34,7 +34,7 @@ var CONFIG = {
   BRIEFING_HOUR: 7,
 
   // The agent's name as it appears in the briefing
-  PERSONA_NAME: 'PennyBrief',
+  PERSONA_NAME: 'Aurora',
 };
 
 // ---------------------------------------------------------------------------
