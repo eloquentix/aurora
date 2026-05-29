@@ -1,53 +1,74 @@
 /**
  * agent.gs — The agent orchestrator
  *
- * This is the heart of the "agent" pattern. An agent is a system that:
- *   1. Has a persona and goal (SYSTEM_PROMPT)
- *   2. Receives input (email data)
- *   3. Reasons about it (calls the AI)
- *   4. Produces structured output (JSON analysis)
- *   5. Can be composed — multiple calls build toward a bigger picture
+ * This is the heart of Aurora. An agent is:
+ *   1. A persona with rules (SYSTEM_PROMPT)
+ *   2. A loop over data (emails) that calls the AI
+ *   3. A synthesis step that ties it all together
  *
- * This file does two things:
- *   - analyzeEmail()          — per-email: summary, actions, proposed reply
- *   - generateOverallSummary() — one call across all analyses to synthesize the day
- *
- * Future extension point (memory/learning):
- *   analyzeEmail() is where you'd inject sender context before calling the AI.
- *   e.g. look up emailData.senderEmail in Firebase/PropertiesService and prepend:
- *   "Context: You've emailed this person 8 times. Last topic: project kickoff."
+ * Two functions:
+ *   - analyzeEmail()           → per-email: category, summary, actions, reply
+ *   - generateOverallSummary() → synthesize the day across all emails + calendar
  */
 
-/**
- * The agent's persona and output rules.
- * This is the system prompt — it shapes every AI call in the session.
- * Keep it tight: specific rules outperform vague instructions.
- */
 var SYSTEM_PROMPT = [
-  'You are Secretary, an AI agent that reads emails and produces concise, structured briefings.',
+  'You are Aurora, an AI assistant that reads emails and produces concise, actionable briefings.',
+  'You are briefing a busy CEO. Be direct, specific, and useful.',
   '',
-  'Your job is to help a busy professional understand what matters in their inbox and take action fast.',
+  'CATEGORIZATION RULES:',
+  '- "action": The email needs a reply, decision, approval, or follow-up. A real human wrote something that expects a response from the user.',
+  '- "fyi": Worth knowing but no action needed. Invoices received, event updates, FYI messages, shipping notifications, payment confirmations.',
+  '- "skip": Newsletters, promotional emails, marketing, LinkedIn digests, Medium digests, automated notifications,',
+  '  security alerts (trusted device added, login from new location), subscription confirmations, app notifications.',
+  '  Emails from "Aurora" or any AI briefing tool are always "skip".',
+  '  When in doubt between fyi and skip, lean toward skip.',
   '',
-  'Guidelines:',
-  '- Be direct and specific. No filler words, no vague summaries.',
-  '- Action items must be concrete: who needs to do what, by when if known.',
-  '- Proposed replies should match the tone of the original email (formal stays formal, casual stays casual).',
-  '- Skip newsletters, automated notifications, receipts, and system emails — flag them as "no action needed".',
-  '- Never fabricate information. If you cannot determine something from the email, say so.',
+  'FYI SUB-CATEGORIES (fyiCategory field):',
+  '- "finance": Bank alerts, deposits, payments, invoices, balance notifications, billing reports.',
+  '- "team": Messages from colleagues or teammates that are informational (not needing action).',
+  '- "system": Security alerts, device notifications, service confirmations, automated reports.',
+  '- "other": Anything else.',
+  '',
+  'REPLY RULES:',
+  '- Only propose a reply for "action" emails where a human reply is clearly expected.',
+  '- Match the LANGUAGE of the original email. Romanian stays Romanian. English stays English. Never translate.',
+  '- Match the tone and formality of the sender. Casual → casual. Formal → formal.',
+  '- For internal colleagues and people you clearly know well: be brief and casual. "Sure, sounds good." not "I acknowledge receipt of your message."',
+  '- Write like a busy, competent professional — not like an AI. No "I hope this email finds you well."',
+  '- Be concise. 1-3 sentences max. Get to the point.',
+  '- If the email is part of a thread, acknowledge context from earlier messages.',
+  '- proposedReply must be null for "fyi" and "skip" emails.',
+  '',
+  'CONTEXT AWARENESS:',
+  '- The "To:" and "CC:" fields tell you who the email is addressed to.',
+  '- If the user is in CC (not in To:), they probably don\'t need to reply — lean toward "fyi".',
+  '- If the email was forwarded BY the user to themselves, summarize what the forwarded content is about.',
+  '  Do NOT say "User forwarded..." — they know they did it. Say what the document/notification IS.',
+  '- If a calendar invite already exists for something discussed in the email, the action may already be resolved.',
+  '- For long threads, the threadContext shows prior messages. Use it to understand the conversation arc.',
+  '',
+  'SUMMARY RULES:',
+  '- 1-2 sentences. Direct and specific.',
+  '- For "skip" emails, one short phrase is enough ("Marketing promo from Leroy Merlin").',
+  '- Never fabricate information not present in the email.',
+  '- Always use second person ("you") when referring to the user, never third person with their name.',
 ].join('\n');
 
 /**
- * Analyzes a single email and returns structured output.
+ * Analyzes a single email. Returns structured output with category.
  *
  * @param {EmailData} emailData
  * @returns {EmailAnalysis}
  *
  * @typedef {Object} EmailAnalysis
- * @property {EmailData} email          The original email data
- * @property {string}    summary        1-2 sentence plain-language summary
- * @property {string[]}  actionItems    Specific actions required (empty if none)
- * @property {string|null} proposedReply Draft reply text (null if no reply warranted)
- * @property {boolean}   error          true if the AI call failed
+ * @property {EmailData}    email          Original email data
+ * @property {string}       category       'action' | 'fyi' | 'skip'
+ * @property {string}       summary        1-2 sentence summary
+ * @property {string[]}     actionItems    Specific actions (empty for fyi/skip)
+ * @property {string|null}  proposedReply  Draft reply (null unless action)
+ * @property {string|null}  skipReason     Why skipped (null if not skip)
+ * @property {string}       fyiCategory    'finance' | 'team' | 'system' | 'other'
+ * @property {boolean}      error          true if AI call failed
  */
 function analyzeEmail(emailData) {
   var prompt = buildAnalysisPrompt(emailData);
@@ -63,109 +84,230 @@ function analyzeEmail(emailData) {
     Logger.log('AI call failed for email from ' + emailData.senderEmail + ': ' + e.message);
     return {
       email: emailData,
-      summary: 'Could not analyze this email: ' + e.message,
+      category: 'skip',
+      summary: 'Could not analyze: ' + e.message,
       actionItems: [],
       proposedReply: null,
+      skipReason: 'error',
+      fyiCategory: 'other',
       error: true,
     };
   }
 
   var parsed = safeJsonParse(responseText);
 
-  // If JSON parsing fails, build a graceful fallback
   if (!parsed) {
     Logger.log('JSON parse failed for response: ' + truncate(responseText, 200));
     return {
       email: emailData,
-      summary: truncate(responseText, 300),
+      category: 'skip',
+      summary: 'Analysis failed (unparseable response)',
       actionItems: [],
       proposedReply: null,
-      error: false,
+      skipReason: 'error',
+      fyiCategory: 'other',
+      error: true,
     };
   }
 
+  var category = parsed.category || 'fyi';
+  if (['action', 'fyi', 'skip'].indexOf(category) === -1) category = 'fyi';
+
+  var fyiCategory = parsed.fyiCategory || 'other';
+  if (['finance', 'team', 'system', 'other'].indexOf(fyiCategory) === -1) fyiCategory = 'other';
+
   return {
     email: emailData,
+    category: category,
     summary: parsed.summary || '',
     actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
-    proposedReply: parsed.proposedReply || null,
+    proposedReply: category === 'action' ? (parsed.proposedReply || null) : null,
+    skipReason: parsed.skipReason || null,
+    fyiCategory: fyiCategory,
     error: false,
   };
 }
 
 /**
- * Generates a 2-3 sentence executive summary across all email analyses.
- * This is the second AI call — it synthesizes the individual analyses into
- * a single "state of the inbox" overview at the top of the briefing.
+ * Generates the overall briefing summary. Includes calendar and FYI context.
  *
  * @param {EmailAnalysis[]} analyses
+ * @param {Object[]} [calendarEvents]  Today's calendar events (optional)
  * @returns {string}
  */
-function generateOverallSummary(analyses) {
+function generateOverallSummary(analyses, calendarEvents) {
   if (!analyses || analyses.length === 0) {
-    return 'Inbox is clear. Nothing new in the last ' + getConfig().HOURS_BACK + ' hours.';
+    return 'Inbox is clear. Nothing new.';
   }
 
-  // Build a compact input: just summaries + action items, no full bodies
-  var lines = analyses.map(function(a, i) {
-    var actions = a.actionItems.length > 0
-      ? 'Actions: ' + a.actionItems.join(' | ')
-      : 'No action needed.';
-    return (i + 1) + '. From ' + a.email.sender + ' — "' + a.email.subject + '"\n   ' +
-      a.summary + '\n   ' + actions;
+  var actionCount = 0, fyiCount = 0, skipCount = 0;
+  analyses.forEach(function(a) {
+    if (a.category === 'action') actionCount++;
+    else if (a.category === 'fyi') fyiCount++;
+    else skipCount++;
   });
 
+  // Build rich context for the AI
+  var actionSummaries = analyses
+    .filter(function(a) { return a.category === 'action'; })
+    .map(function(a) { return '- ' + a.email.sender + ': ' + a.summary; });
+
+  var fyiHighlights = analyses
+    .filter(function(a) { return a.category === 'fyi'; })
+    .map(function(a) { return '- [' + a.fyiCategory + '] ' + a.email.sender + ': ' + a.summary; });
+
+  var calendarContext = '';
+  if (calendarEvents && calendarEvents.length > 0) {
+    calendarContext = '\n\nToday\'s calendar (' + calendarEvents.length + ' events):\n' +
+      calendarEvents.map(function(e) {
+        return '- ' + e.startTime + ': ' + e.title;
+      }).join('\n');
+  }
+
   var prompt = [
-    'Here are summaries of ' + analyses.length + ' emails from this morning\'s inbox:',
+    'Email stats: ' + actionCount + ' need attention, ' + fyiCount + ' FYI, ' + skipCount + ' skipped.',
     '',
-    lines.join('\n\n'),
+    actionCount > 0 ? 'Emails needing action:\n' + actionSummaries.join('\n') : 'No emails need action.',
     '',
-    'Write a 2-3 sentence executive overview of the inbox. What is most urgent? What is the overall theme? ',
-    'Be direct and specific. Do not list every email — synthesize.',
+    fyiHighlights.length > 0 ? 'FYI highlights:\n' + fyiHighlights.join('\n') : '',
+    calendarContext,
+    '',
+    'Write a 2-4 sentence executive summary for a CEO\'s morning briefing.',
+    'DO NOT just repeat the counts — I can see those myself.',
+    'Instead: What are the 1-3 most important things I need to know right now?',
+    'Mention specific money amounts if payments arrived or are due.',
+    'Mention the first meeting of the day if there is one.',
+    'Mention any deadlines or time-sensitive items.',
+    'Be direct, specific, and concise. No filler. No bullet points — just flowing prose.',
   ].join('\n');
 
   try {
     return callAI(prompt, {
       systemPrompt: SYSTEM_PROMPT,
-      maxTokens: 256,
+      maxTokens: 300,
       temperature: 0.4,
     });
   } catch (e) {
     Logger.log('Overall summary failed: ' + e.message);
-    return analyses.length + ' emails processed. See details below.';
+    var parts = [actionCount + ' need attention', fyiCount + ' worth reading', skipCount + ' skipped'];
+    return parts.join('. ') + '.';
   }
 }
 
 /**
- * Builds the per-email analysis prompt.
- * Asks the AI to return a specific JSON structure.
- *
- * @param {EmailData} emailData
- * @returns {string}
+ * Translates recipientRole code into a human-readable description for the AI.
+ */
+function describeRecipientRole(role) {
+  var descriptions = {
+    'direct':  'Primary recipient (directly in To:)',
+    'cc':      'CC\'d — not the primary recipient, just copied',
+    'group':   'One of many recipients in a group email',
+    'self':    'User sent/forwarded this to themselves',
+    'unknown': 'Unknown (possibly BCC or list)',
+  };
+  return descriptions[role] || descriptions['unknown'];
+}
+
+/**
+ * Builds the per-email analysis prompt with full context.
  */
 function buildAnalysisPrompt(emailData) {
-  return [
-    'Analyze the following email and return a JSON object.',
+  var parts = [
+    'Analyze this email and return a JSON object.',
     '',
     'Email:',
     'From: ' + emailData.sender + ' <' + emailData.senderEmail + '>',
     'Subject: ' + emailData.subject,
     'Date: ' + emailData.date,
-    'Body:',
-    emailData.body,
-    '',
-    'Return ONLY a JSON object with these fields:',
-    '{',
-    '  "summary": "1-2 sentence plain-language summary of what this email is about",',
-    '  "actionItems": ["specific action 1", "specific action 2"],',
-    '  "proposedReply": "draft reply text if a reply is warranted, or null if not"',
-    '}',
-    '',
-    'Rules:',
-    '- actionItems must be specific (e.g. "Reply to confirm Thursday meeting" not "Reply to email")',
-    '- actionItems should be empty [] for newsletters, receipts, and automated notifications',
-    '- proposedReply should be null unless a human reply is clearly expected or useful',
-    '- proposedReply text should be ready to send, not a template with placeholders',
-    '- Return only the JSON — no markdown fences, no explanation',
-  ].join('\n');
+    'User\'s role: ' + describeRecipientRole(emailData.recipientRole),
+  ];
+
+  if (emailData.isThread && emailData.threadContext) {
+    parts.push('');
+    parts.push('Thread context (prior messages, oldest first):');
+    parts.push(emailData.threadContext);
+    parts.push('');
+    parts.push('Latest message in thread:');
+  } else if (emailData.isThread) {
+    parts.push('(This is part of an ongoing thread)');
+  }
+
+  parts.push('');
+  parts.push('Body:');
+  parts.push(emailData.body);
+  parts.push('');
+  parts.push('Return ONLY a JSON object:');
+  parts.push('{');
+  parts.push('  "category": "action" | "fyi" | "skip",');
+  parts.push('  "summary": "1-2 sentence summary",');
+  parts.push('  "actionItems": ["specific action needed"] or [],');
+  parts.push('  "proposedReply": "draft reply text" or null,');
+  parts.push('  "skipReason": "newsletter" | "promo" | "notification" | "system" | "error" or null,');
+  parts.push('  "fyiCategory": "finance" | "team" | "system" | "other"');
+  parts.push('}');
+  parts.push('');
+  parts.push('Rules:');
+  parts.push('- category is REQUIRED. Default to "fyi" if unsure between fyi and action.');
+  parts.push('- proposedReply ONLY for "action" emails. Must match the language of the original.');
+  parts.push('- actionItems must be empty [] for "fyi" and "skip" emails.');
+  parts.push('- fyiCategory is REQUIRED for all emails (used for grouping in the briefing).');
+  parts.push('- Return only the JSON — no markdown fences, no explanation.');
+
+  return parts.join('\n');
+}
+
+/**
+ * Verification pass — reviews the assembled briefing for quality issues.
+ * Catches: raw JSON in summaries, nonsensical text, broken formatting.
+ * Fixes issues in-place and returns cleaned data.
+ *
+ * @param {string} overallSummary
+ * @param {EmailAnalysis[]} analyses
+ * @returns {{ overallSummary: string, analyses: EmailAnalysis[] }}
+ */
+function verifyBriefing(overallSummary, analyses) {
+  // Build a compact representation of what we're about to send
+  var issues = [];
+
+  // Check overall summary for problems
+  if (overallSummary.indexOf('{') !== -1 && overallSummary.indexOf('"category"') !== -1) {
+    issues.push('Overall summary contains raw JSON');
+  }
+
+  // Check each analysis for problems
+  analyses.forEach(function(a, i) {
+    // Raw JSON leaked into summary
+    if (a.summary && a.summary.indexOf('"category"') !== -1) {
+      issues.push('Email ' + i + ' (' + a.email.subject + '): summary contains raw JSON');
+      a.summary = 'Analysis produced malformed output';
+      a.category = 'skip';
+      a.skipReason = 'error';
+      a.error = true;
+    }
+    // Markdown fences in summary
+    if (a.summary && a.summary.indexOf('```') !== -1) {
+      issues.push('Email ' + i + ' (' + a.email.subject + '): summary contains code fences');
+      a.summary = a.summary.replace(/```[a-z]*\s*/g, '').replace(/```/g, '').trim();
+    }
+    // Proposed reply contains JSON
+    if (a.proposedReply && a.proposedReply.indexOf('"category"') !== -1) {
+      a.proposedReply = null;
+    }
+  });
+
+  if (issues.length > 0) {
+    Logger.log('Verification found ' + issues.length + ' issue(s): ' + issues.join('; '));
+  } else {
+    Logger.log('Verification passed — no issues found');
+  }
+
+  // If overall summary has issues, try to regenerate it from the analysis data
+  if (overallSummary.indexOf('"category"') !== -1 || overallSummary.length < 10) {
+    var actionCount = analyses.filter(function(a) { return a.category === 'action'; }).length;
+    var fyiCount = analyses.filter(function(a) { return a.category === 'fyi'; }).length;
+    var skipCount = analyses.filter(function(a) { return a.category === 'skip'; }).length;
+    overallSummary = actionCount + ' need your attention, ' + fyiCount + ' worth reading, ' + skipCount + ' skipped.';
+  }
+
+  return { overallSummary: overallSummary, analyses: analyses };
 }

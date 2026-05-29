@@ -23,17 +23,30 @@ function runBriefing() {
   var cfg = getConfig();
   Logger.log('Aurora starting. Provider: ' + cfg.AI_PROVIDER + ', scanning last ' + cfg.HOURS_BACK + 'h');
 
-  // 2. Fetch recent emails
-  var emails = fetchRecentEmails(cfg.HOURS_BACK, cfg.MAX_EMAILS);
+  // 2. Fetch recent emails and calendar events
+  var me = Session.getActiveUser().getEmail().toLowerCase();
+  var emails = fetchRecentEmails(cfg.HOURS_BACK, cfg.MAX_EMAILS, cfg.GMAIL_SEARCH);
   Logger.log('Fetched ' + emails.length + ' emails');
 
+  // Filter out Aurora's own briefing emails (self-flagging prevention)
+  var personaLower = cfg.PERSONA_NAME.toLowerCase();
+  emails = emails.filter(function(e) {
+    var isSelfEmail = e.senderEmail === me && e.subject.toLowerCase().indexOf(personaLower) !== -1;
+    if (isSelfEmail) Logger.log('Filtered self-email: ' + e.subject);
+    return !isSelfEmail;
+  });
+  Logger.log('After self-filter: ' + emails.length + ' emails');
+
+  var calendarEvents = fetchTodayEvents();
+  Logger.log('Calendar: ' + calendarEvents.length + ' events today');
+
   if (emails.length === 0) {
-    sendBriefingEmail(
-      'Inbox is clear. Nothing new in the last ' + cfg.HOURS_BACK + ' hours.',
-      [],
-      cfg
-    );
-    Logger.log('Empty inbox briefing sent.');
+    var otherCount = countNonPrimaryEmails(cfg.HOURS_BACK);
+    var emptyMsg = otherCount > 0
+      ? 'Nothing important. ' + otherCount + ' other email' + (otherCount !== 1 ? 's' : '') + ' arrived (promotions, notifications) — nothing that needs you.'
+      : 'Inbox is clear. Nothing new in the last ' + cfg.HOURS_BACK + ' hours.';
+    sendBriefingEmail(emptyMsg, [], calendarEvents, cfg);
+    Logger.log('Empty inbox briefing sent. (' + otherCount + ' non-primary skipped)');
     return;
   }
 
@@ -57,12 +70,21 @@ function runBriefing() {
     }
   }
 
-  // 5. Generate overall summary
+  // 5. Generate overall summary (with calendar context)
   Logger.log('Generating overall summary...');
-  var overallSummary = generateOverallSummary(analyses);
+  var overallSummary = generateOverallSummary(analyses, calendarEvents);
 
-  // 6. Build and send the briefing email
-  sendBriefingEmail(overallSummary, analyses, cfg);
+  // 6. Verification pass — AI reviews the assembled output for quality
+  Logger.log('Running verification pass...');
+  var verified = verifyBriefing(overallSummary, analyses);
+  overallSummary = verified.overallSummary;
+  analyses = verified.analyses;
+
+  // 7. Label skipped emails in Gmail
+  labelSkippedEmails(analyses);
+
+  // 8. Build and send the briefing email
+  sendBriefingEmail(overallSummary, analyses, calendarEvents, cfg);
 
   Logger.log('Briefing sent. ' + analyses.length + ' emails processed.');
 }
@@ -81,8 +103,22 @@ function testBriefing() {
   var cfg = getConfig();
   Logger.log('=== TEST MODE: scanning last 4 hours, max 5 emails ===');
 
-  var emails = fetchRecentEmails(4, 5); // small cap — keeps test fast and avoids rate limits
+  var testHours = 4;
+  var emails = fetchRecentEmails(testHours, 5, cfg.GMAIL_SEARCH);
   Logger.log('Found ' + emails.length + ' emails');
+
+  var calendarEvents = fetchTodayEvents();
+  Logger.log('Calendar: ' + calendarEvents.length + ' events today');
+
+  if (emails.length === 0) {
+    var otherCount = countNonPrimaryEmails(testHours);
+    var emptyMsg = otherCount > 0
+      ? 'Nothing important. ' + otherCount + ' other email' + (otherCount !== 1 ? 's' : '') + ' arrived (promotions, notifications) — nothing that needs you.'
+      : 'Inbox is clear. Nothing new in the last ' + testHours + ' hours.';
+    sendBriefingEmail(emptyMsg, [], calendarEvents, cfg);
+    Logger.log('=== TEST COMPLETE (empty Primary, ' + otherCount + ' non-primary) — check your inbox! ===');
+    return;
+  }
 
   var analyses = [];
   for (var i = 0; i < emails.length; i++) {
@@ -91,10 +127,15 @@ function testBriefing() {
     if (i < emails.length - 1) Utilities.sleep(getCallDelay());
   }
 
-  var summary = generateOverallSummary(analyses);
+  var summary = generateOverallSummary(analyses, calendarEvents);
   Logger.log('Overall summary: ' + summary);
 
-  sendBriefingEmail(summary, analyses, cfg);
+  var verified = verifyBriefing(summary, analyses);
+  summary = verified.overallSummary;
+  analyses = verified.analyses;
+
+  labelSkippedEmails(analyses);
+  sendBriefingEmail(summary, analyses, calendarEvents, cfg);
   Logger.log('=== TEST COMPLETE — check your inbox! ===');
 }
 
@@ -105,12 +146,12 @@ function testBriefing() {
  * @param {EmailAnalysis[]} analyses
  * @param {Object}          cfg
  */
-function sendBriefingEmail(overallSummary, analyses, cfg) {
+function sendBriefingEmail(overallSummary, analyses, calendarEvents, cfg) {
   var me = Session.getActiveUser().getEmail();
   var subject = cfg.PERSONA_NAME + ' — ' + formatToday();
 
-  var htmlBody = buildBriefingHTML(overallSummary, analyses, cfg);
-  var plainBody = buildBriefingPlainText(overallSummary, analyses);
+  var htmlBody = buildBriefingHTML(overallSummary, analyses, calendarEvents, cfg);
+  var plainBody = buildBriefingPlainText(overallSummary, analyses, calendarEvents);
 
   GmailApp.sendEmail(me, subject, plainBody, {
     htmlBody: htmlBody,

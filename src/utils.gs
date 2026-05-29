@@ -81,15 +81,37 @@ function buildGmailUrl(threadId) {
 }
 
 /**
- * Builds a mailto: URL pre-filled with recipient, subject, and body.
- * Truncates body to 1500 chars to avoid browser/client limits.
+ * Builds a Gmail web compose URL pre-filled with recipient, subject, and body.
+ * Opens directly in Gmail (not Apple Mail or other default clients).
+ * Truncates body to 1500 chars to avoid URL length limits.
  */
-function buildMailtoLink(toEmail, subject, body) {
+function buildGmailComposeLink(toEmail, subject, body) {
   var safeBody = truncate(body || '', 1500);
-  // toEmail must NOT be encoded — encoding @ as %40 breaks the To: field in Gmail
-  return 'mailto:' + toEmail +
-    '?subject=' + encodeURIComponent(subject) +
+  return 'https://mail.google.com/mail/?view=cm' +
+    '&to=' + encodeURIComponent(toEmail) +
+    '&su=' + encodeURIComponent(subject) +
     '&body=' + encodeURIComponent(safeBody);
+}
+
+/**
+ * Extracts a Google Meet link from a CalendarEvent.
+ * Checks the event description and location for meet.google.com URLs.
+ *
+ * @param {CalendarEvent} event  A CalendarApp event object
+ * @returns {string|null}
+ */
+function extractMeetLink(event) {
+  var sources = [
+    event.getDescription() || '',
+    event.getLocation() || '',
+  ];
+
+  for (var i = 0; i < sources.length; i++) {
+    var match = sources[i].match(/https:\/\/meet\.google\.com\/[a-z\-]+/i);
+    if (match) return match[0];
+  }
+
+  return null;
 }
 
 /**

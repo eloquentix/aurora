@@ -35,6 +35,11 @@ var CONFIG = {
   // Hour to send the briefing (24h, user's timezone)
   BRIEFING_HOUR: 7,
 
+  // Gmail search query override. Default: all recent inbox emails.
+  // Set to null to use the default: 'newer_than:Xh in:inbox'
+  // If you use Gmail tabs: 'newer_than:20h in:inbox category:primary' to skip Promotions/Social
+  GMAIL_SEARCH: null,
+
   // The agent's name as it appears in the briefing
   PERSONA_NAME: 'Aurora',
 };
@@ -63,6 +68,7 @@ function getConfig() {
   if (props.MAX_EMAILS)  cfg.MAX_EMAILS  = parseInt(props.MAX_EMAILS, 10);
   if (props.BRIEFING_HOUR) cfg.BRIEFING_HOUR = parseInt(props.BRIEFING_HOUR, 10);
   if (props.PERSONA_NAME)  cfg.PERSONA_NAME  = props.PERSONA_NAME.trim();
+  if (props.GMAIL_SEARCH)  cfg.GMAIL_SEARCH  = props.GMAIL_SEARCH.trim();
 
   if (props.PRIORITY_CONTACTS) {
     cfg.PRIORITY_CONTACTS = props.PRIORITY_CONTACTS
