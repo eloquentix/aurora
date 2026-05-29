@@ -2,7 +2,7 @@
 
 **Your AI-powered morning email briefing.** Deploy in 5 minutes, runs entirely in Google Apps Script — no server, no infrastructure, no ongoing maintenance.
 
-Every morning, Aurora reads your Gmail inbox, analyzes each email with an AI model of your choice, and delivers a structured briefing: summaries, action items with direct Gmail links, and one-click proposed replies.
+Every morning, Aurora reads your Gmail inbox and Google Calendar, analyzes each email with an AI model of your choice, and delivers a structured briefing: today's schedule, summaries, action items with direct Gmail links, and one-click proposed replies.
 
 Built by [Eloquentix](https://eloquentix.com) as an open-source demonstration of practical AI agents — simple enough to understand in an afternoon, useful enough to run every day.
 
@@ -12,23 +12,30 @@ Built by [Eloquentix](https://eloquentix.com) as an open-source demonstration of
 
 A daily email that looks like this:
 
-> **Good morning. Briefing for Wednesday, May 27 · 12 emails**
+> **AURORA**
+> Wednesday, May 27 · 12 emails
+>
+> **Today's Schedule**
+> 10:00 AM  Design review with Sarah
+> 2:00 PM   Standup
 >
 > **Overview**
-> Three items need your attention: a client is waiting on a proposal, a contractor sent an invoice, and tomorrow's meeting was rescheduled.
+> Acme Corp is waiting on your proposal — deadline Friday. $24K payment from Looma landed overnight. Design call moved to 3pm.
 >
-> **Action Items**
-> → Send proposal to Acme Corp — deadline Friday `[open]`
-> → Approve invoice from Jane Doe ($2,400) `[open]`
-> → Confirm new time for 2pm design call `[open]`
+> **Requires Your Attention (3)**
 >
-> ---
 > **Re: Proposal** · Acme Corp · 9:14 AM
 > Client followed up asking for the proposal by Friday. Budget approval expires end of month.
+> → Send proposal by Thursday EOD
 >
-> *Proposed reply:* "Hi Sarah, I'll have the proposal over to you by Thursday EOD. Looking forward to it."
->
+> *Proposed reply:* "Hi Sarah, I'll have the proposal over to you by Thursday EOD."
 > `[Reply in Gmail]` `[Open Thread]`
+>
+> **Worth Reading (5)**
+> *Finance* — $24,000 deposit from Looma Project · PNC balance: $96,678
+> *Team* — Andrei shared Opus 4.8 announcement
+>
+> Skipped: 4 emails (2 newsletters, 2 promos)
 
 ---
 
@@ -36,20 +43,22 @@ A daily email that looks like this:
 
 Aurora is a small AI agent:
 
-1. **Reads** your Gmail inbox (last 20 hours)
-2. **Analyzes** each email — summary, action items, proposed reply
-3. **Synthesizes** the inbox into an executive overview
-4. **Delivers** a rich HTML briefing to your inbox
+1. **Reads** your Gmail inbox (last 20 hours) and Google Calendar
+2. **Categorizes** each email — action, FYI, or skip — with sub-categories
+3. **Synthesizes** the inbox into an executive overview with calendar context
+4. **Delivers** a newspaper-style HTML briefing to your inbox
 
 The agent pattern is intentionally simple: a system prompt that defines the persona, a loop over emails that calls the AI, and a second call to synthesize the whole. The code is meant to be read and extended.
 
 ```
 runBriefing()
   ├─ fetchRecentEmails()       reads Gmail via GmailApp
+  ├─ fetchTodayEvents()        reads Google Calendar
   ├─ for each email:
-  │    └─ analyzeEmail()       calls AI → JSON: summary, actions, reply
-  ├─ generateOverallSummary()  second AI call to synthesize the inbox
-  └─ buildBriefingHTML()       HTML email with mailto: reply links
+  │    └─ analyzeEmail()       calls AI → JSON: category, summary, actions, reply
+  ├─ generateOverallSummary()  AI synthesizes inbox + calendar
+  ├─ verifyBriefing()          quality check on assembled output
+  └─ buildBriefingHTML()       newspaper-style email with Gmail compose links
 ```
 
 ---
@@ -179,6 +188,7 @@ Edit `src/config.gs` or set Script Properties to override without touching code.
 | `MAX_EMAILS` | `50` | Cap per run (controls cost) |
 | `BRIEFING_HOUR` | `7` | Hour to send the briefing (0–23) |
 | `PRIORITY_CONTACTS` | *(empty)* | Comma-separated emails to highlight at the top |
+| `GMAIL_SEARCH` | *(auto)* | Custom Gmail search query (default: `newer_than:Xh in:inbox`) |
 | `PERSONA_NAME` | `Aurora` | Agent name in email subject and footer |
 
 ---
@@ -191,7 +201,7 @@ The codebase is intentionally small and readable. Key extension points:
 
 **Add a new provider** — create `src/providers/myprovider.gs` with a single function, add one case to the switch in `src/ai.gs`. That's it.
 
-**Add memory** — `analyzeEmail()` in `src/agent.gs` is where you'd inject sender context before calling the AI. A future version might look up the sender's email in Firebase and prepend: *"You've exchanged 12 emails with this person. Last topic: contract renewal."*
+**Add memory** — `analyzeEmail()` in `src/agent.gs` is where you'd inject sender context before calling the AI. A future version might look up the sender in Firebase and prepend: *"You've exchanged 12 emails with this person. Last topic: contract renewal."*
 
 **Change the persona** — edit `SYSTEM_PROMPT` in `src/agent.gs`.
 
@@ -204,18 +214,19 @@ The codebase is intentionally small and readable. Key extension points:
 ```
 src/
   main.gs              Entry points: runBriefing(), testBriefing(), installTrigger()
-  agent.gs             The agent: persona, analysis loop, synthesis
+  agent.gs             The agent: persona, analysis loop, synthesis, verification
   ai.gs                Provider router — one callAI() for all providers
   providers/
     claude.gs          Anthropic Messages API
     openai.gs          OpenAI Chat Completions
     gemini.gs          Google Gemini
     grok.gs            xAI Grok (OpenAI-compatible)
-  gmail.gs             Gmail reading via GmailApp (no IMAP, no passwords)
-  briefing.gs          HTML email builder with inline CSS and mailto links
+  gmail.gs             Gmail reading + recipient role inference
+  calendar.gs          Google Calendar integration
+  briefing.gs          Newspaper-style HTML email with Gmail compose links
   config.gs            Config defaults + Script Properties bridge
   utils.gs             Shared utilities
-  setup.example.gs     Template for your API keys (copy to setup.gs)
+  setup.gs             API key setup (paste your key, run once)
 ```
 
 ---
