@@ -348,7 +348,7 @@ function buildActionCard(analysis) {
   var replyHtml = '';
   if (analysis.proposedReply) {
     var replySubject = email.subject.match(/^re:/i) ? email.subject : 'Re: ' + email.subject;
-    var composeHref = buildGmailComposeLink(email.senderEmail, replySubject, analysis.proposedReply);
+    var mailtoHref = buildMailtoLink(email.senderEmail, replySubject, analysis.proposedReply);
 
     replyHtml = [
       '<div style="margin-top:12px;padding-top:12px;border-top:1px solid ' + COLORS.border + '">',
@@ -360,7 +360,7 @@ function buildActionCard(analysis) {
       escapeHtml(analysis.proposedReply),
       '</div>',
       '<div style="margin-top:10px">',
-      '<a href="' + composeHref + '" style="display:inline-block;background:' + COLORS.accent + ';',
+      '<a href="' + mailtoHref + '" style="display:inline-block;background:' + COLORS.accent + ';',
       'color:#fff;text-decoration:none;font-size:12px;font-weight:500;padding:7px 16px;',
       'border-radius:4px">Reply in Gmail</a>',
       ' &nbsp;',

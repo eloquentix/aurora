@@ -81,15 +81,14 @@ function buildGmailUrl(threadId) {
 }
 
 /**
- * Builds a Gmail web compose URL pre-filled with recipient, subject, and body.
- * Opens directly in Gmail (not Apple Mail or other default clients).
- * Truncates body to 1500 chars to avoid URL length limits.
+ * Builds a mailto: URL pre-filled with recipient, subject, and body.
+ * Truncates body to 1500 chars to avoid browser/client limits.
  */
-function buildGmailComposeLink(toEmail, subject, body) {
+function buildMailtoLink(toEmail, subject, body) {
   var safeBody = truncate(body || '', 1500);
-  return 'https://mail.google.com/mail/?view=cm' +
-    '&to=' + encodeURIComponent(toEmail) +
-    '&su=' + encodeURIComponent(subject) +
+  // toEmail must NOT be encoded — encoding @ as %40 breaks the To: field in Gmail
+  return 'mailto:' + toEmail +
+    '?subject=' + encodeURIComponent(subject) +
     '&body=' + encodeURIComponent(safeBody);
 }
 
