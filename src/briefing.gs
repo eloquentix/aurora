@@ -68,6 +68,7 @@ function buildBriefingHTML(overallSummary, analyses, calendarEvents, cfg) {
     buildDivider(),
     (calendarEvents && calendarEvents.length > 0) ? buildCalendarSection(calendarEvents) + buildDivider() : '',
     buildSummaryBox(overallSummary),
+    buildAugurSection(cfg),
     buildDivider(),
     actionEmails.length > 0 ? buildActionSection(actionEmails) : '',
     fyiEmails.length > 0 ? buildFyiSection(fyiEmails) : '',

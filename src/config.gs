@@ -42,6 +42,11 @@ var CONFIG = {
 
   // The agent's name as it appears in the briefing
   PERSONA_NAME: 'Aurora',
+
+  // Augur forecaster status endpoint (full token URL). Empty = section omitted.
+  // Secret (token in path) — set in Script Properties, not here.
+  // e.g. https://augur.eloquentix.com/x/<token>/status.json
+  AUGUR_STATUS_URL: '',
 };
 
 // ---------------------------------------------------------------------------
@@ -69,6 +74,7 @@ function getConfig() {
   if (props.BRIEFING_HOUR) cfg.BRIEFING_HOUR = parseInt(props.BRIEFING_HOUR, 10);
   if (props.PERSONA_NAME)  cfg.PERSONA_NAME  = props.PERSONA_NAME.trim();
   if (props.GMAIL_SEARCH)  cfg.GMAIL_SEARCH  = props.GMAIL_SEARCH.trim();
+  if (props.AUGUR_STATUS_URL) cfg.AUGUR_STATUS_URL = props.AUGUR_STATUS_URL.trim();
 
   if (props.PRIORITY_CONTACTS) {
     cfg.PRIORITY_CONTACTS = props.PRIORITY_CONTACTS
