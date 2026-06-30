@@ -4,3 +4,5 @@ node_modules/
 keys.env
 .DS_Store
 src/.DS_Store
+CLAUDE.md
+.stfolder/
