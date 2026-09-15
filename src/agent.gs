@@ -44,6 +44,15 @@ var SYSTEM_PROMPT = [
   '- If the user is in CC (not in To:), they probably don\'t need to reply — lean toward "fyi".',
   '- If the email was forwarded BY the user to themselves, summarize what the forwarded content is about.',
   '  Do NOT say "User forwarded..." — they know they did it. Say what the document/notification IS.',
+  '- If the latest message was WRITTEN BY THE USER to other people (role "sent"), the user is the one asking,',
+  '  not the one being asked. Never treat the user\'s own requests as requests TO the user.',
+  '  Summarize as "You asked <recipient> for X" / "You sent <recipient> Y". The ball is in the recipient\'s court.',
+  '  Category: "fyi" (fyiCategory "team" if a colleague) unless the user\'s own message states a follow-up they must do.',
+  '  proposedReply must be null — the user cannot reply to themselves.',
+  '- "Recent sent mail" lists what the user wrote in the last few days. Use it to:',
+  '  (a) read incoming messages as replies to the user\'s earlier requests when subjects/people match,',
+  '  (b) NOT flag as "action" something the user has already answered or handled,',
+  '  (c) avoid proposing a reply that repeats what the user already said.',
   '- If a calendar invite already exists for something discussed in the email, the action may already be resolved.',
   '- For long threads, the threadContext shows prior messages. Use it to understand the conversation arc.',
   '',
@@ -70,8 +79,8 @@ var SYSTEM_PROMPT = [
  * @property {string}       fyiCategory    'finance' | 'team' | 'system' | 'other'
  * @property {boolean}      error          true if AI call failed
  */
-function analyzeEmail(emailData) {
-  var prompt = buildAnalysisPrompt(emailData);
+function analyzeEmail(emailData, sentContext) {
+  var prompt = buildAnalysisPrompt(emailData, sentContext);
 
   var responseText;
   try {
@@ -135,7 +144,7 @@ function analyzeEmail(emailData) {
  * @param {Object[]} [calendarEvents]  Today's calendar events (optional)
  * @returns {string}
  */
-function generateOverallSummary(analyses, calendarEvents) {
+function generateOverallSummary(analyses, calendarEvents, sentContext) {
   if (!analyses || analyses.length === 0) {
     return 'Inbox is clear. Nothing new.';
   }
@@ -164,6 +173,8 @@ function generateOverallSummary(analyses, calendarEvents) {
       }).join('\n');
   }
 
+  var sentBlock = formatSentContext(sentContext);
+
   var prompt = [
     'Email stats: ' + actionCount + ' need attention, ' + fyiCount + ' FYI, ' + skipCount + ' skipped.',
     '',
@@ -171,6 +182,7 @@ function generateOverallSummary(analyses, calendarEvents) {
     '',
     fyiHighlights.length > 0 ? 'FYI highlights:\n' + fyiHighlights.join('\n') : '',
     calendarContext,
+    sentBlock ? '\n' + sentBlock : '',
     '',
     'Write a 2-4 sentence executive summary for a CEO\'s morning briefing.',
     'DO NOT just repeat the counts — I can see those myself.',
@@ -178,6 +190,7 @@ function generateOverallSummary(analyses, calendarEvents) {
     'Mention specific money amounts if payments arrived or are due.',
     'Mention the first meeting of the day if there is one.',
     'Mention any deadlines or time-sensitive items.',
+    'If you asked someone for something recently (see sent mail) and no reply has arrived, mention it as "still waiting on X".',
     'Be direct, specific, and concise. No filler. No bullet points — just flowing prose.',
   ].join('\n');
 
@@ -202,25 +215,50 @@ function describeRecipientRole(role) {
     'direct':  'Primary recipient (directly in To:)',
     'cc':      'CC\'d — not the primary recipient, just copied',
     'group':   'One of many recipients in a group email',
-    'self':    'User sent/forwarded this to themselves',
+    'self':    'User sent/forwarded this to themselves (note-to-self)',
+    'sent':    'USER IS THE AUTHOR — they wrote this to the people in To:/CC:. They are asking, not being asked.',
     'unknown': 'Unknown (possibly BCC or list)',
   };
   return descriptions[role] || descriptions['unknown'];
 }
 
 /**
+ * Formats recent sent mail as a compact block for the AI.
+ * Marks items belonging to the thread under analysis.
+ *
+ * @param {SentItem[]} sentContext
+ * @param {string} [currentThreadId]
+ * @returns {string}  '' if nothing to show
+ */
+function formatSentContext(sentContext, currentThreadId) {
+  if (!sentContext || sentContext.length === 0) return '';
+  var lines = sentContext.map(function(s) {
+    var tag = (currentThreadId && s.threadId === currentThreadId) ? ' [SAME THREAD]' : '';
+    return '- ' + s.date + ' → ' + s.to + ' | ' + s.subject + tag + ' | ' + s.snippet;
+  });
+  return 'Recent sent mail (what the user wrote recently, newest first):\n' + lines.join('\n');
+}
+
+/**
  * Builds the per-email analysis prompt with full context.
  */
-function buildAnalysisPrompt(emailData) {
-  var parts = [
-    'Analyze this email and return a JSON object.',
-    '',
-    'Email:',
-    'From: ' + emailData.sender + ' <' + emailData.senderEmail + '>',
-    'Subject: ' + emailData.subject,
-    'Date: ' + emailData.date,
-    'User\'s role: ' + describeRecipientRole(emailData.recipientRole),
-  ];
+function buildAnalysisPrompt(emailData, sentContext) {
+  var parts = ['Analyze this email and return a JSON object.'];
+
+  var sentBlock = formatSentContext(sentContext, emailData.threadId);
+  if (sentBlock) {
+    parts.push('');
+    parts.push(sentBlock);
+  }
+
+  parts.push('');
+  parts.push('Email:');
+  parts.push('From: ' + emailData.sender + ' <' + emailData.senderEmail + '>');
+  parts.push('To: ' + truncate(emailData.toRecipients || '', 200));
+  if (emailData.ccRecipients) parts.push('CC: ' + truncate(emailData.ccRecipients, 200));
+  parts.push('Subject: ' + emailData.subject);
+  parts.push('Date: ' + emailData.date);
+  parts.push('User\'s role: ' + describeRecipientRole(emailData.recipientRole));
 
   if (emailData.isThread && emailData.threadContext) {
     parts.push('');

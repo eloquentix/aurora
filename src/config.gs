@@ -28,6 +28,14 @@ var CONFIG = {
   // Maximum characters of email body to send to the AI
   MAX_BODY_CHARS: 2000,
 
+  // Days of the user's own sent mail to feed the AI as context (0 = off).
+  // Lets the AI read incoming replies against what you asked for, and skip
+  // things you've already handled.
+  SENT_CONTEXT_DAYS: 5,
+
+  // Cap on sent messages included as context (newest first)
+  SENT_CONTEXT_MAX: 40,
+
   // Email addresses to treat as high-priority (replies from people you've reached out to)
   // e.g. ['colleague@company.com', 'client@startup.io']
   PRIORITY_CONTACTS: [],
@@ -71,6 +79,8 @@ function getConfig() {
   if (props.AI_MODEL)    cfg.AI_MODEL    = props.AI_MODEL.trim();
   if (props.HOURS_BACK)  cfg.HOURS_BACK  = parseInt(props.HOURS_BACK, 10);
   if (props.MAX_EMAILS)  cfg.MAX_EMAILS  = parseInt(props.MAX_EMAILS, 10);
+  if (props.SENT_CONTEXT_DAYS !== undefined) cfg.SENT_CONTEXT_DAYS = parseInt(props.SENT_CONTEXT_DAYS, 10) || 0;
+  if (props.SENT_CONTEXT_MAX) cfg.SENT_CONTEXT_MAX = parseInt(props.SENT_CONTEXT_MAX, 10);
   if (props.BRIEFING_HOUR) cfg.BRIEFING_HOUR = parseInt(props.BRIEFING_HOUR, 10);
   if (props.PERSONA_NAME)  cfg.PERSONA_NAME  = props.PERSONA_NAME.trim();
   if (props.GMAIL_SEARCH)  cfg.GMAIL_SEARCH  = props.GMAIL_SEARCH.trim();

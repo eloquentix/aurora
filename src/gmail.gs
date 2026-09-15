@@ -148,11 +148,12 @@ function classifyEmails(emails, priorityContacts) {
  * @param {string} toField     Raw To: header
  * @param {string} ccField     Raw CC: header
  * @param {string} senderEmail Sender's email (to detect self-sent/forwarded)
- * @returns {string} 'direct' | 'cc' | 'group' | 'self' | 'unknown'
+ * @returns {string} 'direct' | 'cc' | 'group' | 'self' | 'sent' | 'unknown'
  *   - direct: user is the sole or primary To: recipient
  *   - cc: user is in CC (not in To:)
  *   - group: user is one of many in To:
- *   - self: sender is the user (forwarded to self, or own sent mail)
+ *   - self: user sent this to themselves (forward-to-self, note-to-self)
+ *   - sent: user wrote this to OTHER people (latest message in thread is theirs)
  *   - unknown: couldn't determine
  */
 function inferRecipientRole(toField, ccField, senderEmail) {
@@ -163,14 +164,20 @@ function inferRecipientRole(toField, ccField, senderEmail) {
     return 'unknown';
   }
 
-  // Self-sent (forwarded to self, or own email)
-  if (senderEmail === me) return 'self';
-
   var toLower = (toField || '').toLowerCase();
   var ccLower = (ccField || '').toLowerCase();
 
   var inTo = toLower.indexOf(me) !== -1;
   var inCc = ccLower.indexOf(me) !== -1;
+
+  // User is the sender: note-to-self only if nobody else is addressed
+  if (senderEmail === me) {
+    var others = (toLower + ',' + ccLower).split(',').filter(function(r) {
+      r = r.trim();
+      return r.length > 0 && r.indexOf(me) === -1;
+    });
+    return others.length === 0 ? 'self' : 'sent';
+  }
 
   if (inCc && !inTo) return 'cc';
 
@@ -182,6 +189,65 @@ function inferRecipientRole(toField, ccField, senderEmail) {
 
   // BCC or some other routing — can't tell
   return 'unknown';
+}
+
+/**
+ * Fetches the user's recently sent messages as compact one-liners.
+ * Gives the AI memory of what the user asked for / replied to recently,
+ * so incoming replies are read in context and already-handled items aren't
+ * flagged again.
+ *
+ * @param {number} daysBack  How many days of sent mail to include
+ * @param {number} maxItems  Cap on messages returned
+ * @returns {SentItem[]}  Newest first
+ *
+ * @typedef {Object} SentItem
+ * @property {string} date      Formatted date
+ * @property {string} to        To: recipients (raw header, truncated)
+ * @property {string} subject
+ * @property {string} snippet   First ~200 chars of plain body
+ * @property {string} threadId
+ */
+function fetchSentContext(daysBack, maxItems) {
+  if (!daysBack || daysBack < 1) return [];
+  var me;
+  try {
+    me = Session.getActiveUser().getEmail().toLowerCase();
+  } catch (e) {
+    return [];
+  }
+
+  var cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+  var items = [];
+  try {
+    var threads = GmailApp.search('in:sent newer_than:' + daysBack + 'd', 0, maxItems);
+    var msgLists = GmailApp.getMessagesForThreads(threads);
+    for (var i = 0; i < msgLists.length; i++) {
+      var msgs = msgLists[i];
+      for (var j = 0; j < msgs.length; j++) {
+        var m = msgs[j];
+        if (m.getDate() < cutoff) continue;
+        if (extractEmailAddress(m.getFrom()) !== me) continue;
+        var snippet = m.getPlainBody() || stripHtml(m.getBody()) || '';
+        // Drop quoted reply tail — keep only what the user actually typed
+        snippet = snippet.split(/\r?\n(On .{5,120} wrote:|-{3,} ?Forwarded|From: )/)[0];
+        items.push({
+          date: formatDate(m.getDate()),
+          rawDate: m.getDate(),
+          to: truncate(m.getTo() || '', 80),
+          subject: m.getSubject() || '(no subject)',
+          snippet: truncate(snippet.replace(/\s+/g, ' ').trim(), 200),
+          threadId: threads[i].getId(),
+        });
+      }
+    }
+  } catch (e) {
+    Logger.log('Sent context fetch failed: ' + e.message);
+    return [];
+  }
+
+  items.sort(function(a, b) { return b.rawDate - a.rawDate; });
+  return items.slice(0, maxItems);
 }
 
 /**

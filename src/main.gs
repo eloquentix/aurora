@@ -40,6 +40,9 @@ function runBriefing() {
   var calendarEvents = fetchTodayEvents();
   Logger.log('Calendar: ' + calendarEvents.length + ' events today');
 
+  var sentContext = fetchSentContext(cfg.SENT_CONTEXT_DAYS, cfg.SENT_CONTEXT_MAX);
+  Logger.log('Sent context: ' + sentContext.length + ' messages from last ' + cfg.SENT_CONTEXT_DAYS + 'd');
+
   if (emails.length === 0) {
     var otherCount = countNonPrimaryEmails(cfg.HOURS_BACK);
     var emptyMsg = otherCount > 0
@@ -59,7 +62,7 @@ function runBriefing() {
   var analyses = [];
 
   for (var i = 0; i < allEmails.length; i++) {
-    var analysis = analyzeEmail(allEmails[i]);
+    var analysis = analyzeEmail(allEmails[i], sentContext);
     analyses.push(analysis);
     Logger.log('Analyzed (' + (i + 1) + '/' + allEmails.length + '): ' + allEmails[i].subject);
 
@@ -72,7 +75,7 @@ function runBriefing() {
 
   // 5. Generate overall summary (with calendar context)
   Logger.log('Generating overall summary...');
-  var overallSummary = generateOverallSummary(analyses, calendarEvents);
+  var overallSummary = generateOverallSummary(analyses, calendarEvents, sentContext);
 
   // 6. Verification pass — AI reviews the assembled output for quality
   Logger.log('Running verification pass...');
@@ -110,6 +113,9 @@ function testBriefing() {
   var calendarEvents = fetchTodayEvents();
   Logger.log('Calendar: ' + calendarEvents.length + ' events today');
 
+  var sentContext = fetchSentContext(cfg.SENT_CONTEXT_DAYS, cfg.SENT_CONTEXT_MAX);
+  Logger.log('Sent context: ' + sentContext.length + ' messages');
+
   if (emails.length === 0) {
     var otherCount = countNonPrimaryEmails(testHours);
     var emptyMsg = otherCount > 0
@@ -123,11 +129,11 @@ function testBriefing() {
   var analyses = [];
   for (var i = 0; i < emails.length; i++) {
     Logger.log('Analyzing: ' + emails[i].subject);
-    analyses.push(analyzeEmail(emails[i]));
+    analyses.push(analyzeEmail(emails[i], sentContext));
     if (i < emails.length - 1) Utilities.sleep(getCallDelay());
   }
 
-  var summary = generateOverallSummary(analyses, calendarEvents);
+  var summary = generateOverallSummary(analyses, calendarEvents, sentContext);
   Logger.log('Overall summary: ' + summary);
 
   var verified = verifyBriefing(summary, analyses);
