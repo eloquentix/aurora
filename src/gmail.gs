@@ -6,14 +6,18 @@
  */
 
 /**
- * Fetches recent inbox threads and parses them into EmailData objects.
+ * Fetches inbox threads in the scan window and parses them into EmailData.
  *
- * @param {number} hoursBack  How many hours back to scan
- * @param {number} maxEmails  Cap on emails returned
+ * The query deliberately does NOT filter on read state: a thread you opened
+ * on your phone and forgot about still needs to be in the briefing.
+ *
+ * @param {ScanWindow} win        Window from computeScanWindow()
+ * @param {number}     maxEmails  Cap on emails returned
+ * @param {string}     [gmailSearch]  Full query override (window ignored)
  * @returns {EmailData[]}
  */
-function fetchRecentEmails(hoursBack, maxEmails, gmailSearch) {
-  var query = gmailSearch || ('newer_than:' + hoursBack + 'h in:inbox');
+function fetchRecentEmails(win, maxEmails, gmailSearch) {
+  var query = gmailSearch || buildInboxQuery(win);
   Logger.log('Gmail search: ' + query);
   var threads = GmailApp.search(query, 0, maxEmails);
 
@@ -28,6 +32,20 @@ function fetchRecentEmails(hoursBack, maxEmails, gmailSearch) {
   }
 
   return emails;
+}
+
+/**
+ * Builds the inbox query for a scan window.
+ *
+ * Gmail's `after:` accepts epoch seconds and is second-granular, which is what
+ * the last-run watermark needs — `newer_than:Xh` can only express whole hours
+ * and would re-show or skip emails around the boundary.
+ *
+ * @param {ScanWindow} win
+ * @returns {string}
+ */
+function buildInboxQuery(win) {
+  return 'after:' + win.sinceEpoch + ' in:inbox';
 }
 
 /**
@@ -254,12 +272,12 @@ function fetchSentContext(daysBack, maxItems) {
  * Counts recent non-primary emails (Promotions, Social, Updates, Forums).
  * Used to give context when Primary is empty ("nothing important, but X other emails arrived").
  *
- * @param {number} hoursBack
+ * @param {ScanWindow} win
  * @returns {number}
  */
-function countNonPrimaryEmails(hoursBack) {
+function countNonPrimaryEmails(win) {
   try {
-    var query = 'newer_than:' + hoursBack + 'h in:inbox -category:primary';
+    var query = buildInboxQuery(win) + ' -category:primary';
     var threads = GmailApp.search(query, 0, 100);
     return threads.length;
   } catch (e) {

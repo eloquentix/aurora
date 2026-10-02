@@ -2,12 +2,22 @@
  * providers/claude.gs — Anthropic Claude adapter
  *
  * API docs: https://docs.anthropic.com/en/api/messages
- * Default model: claude-haiku-4-5-20251001 (fast, cheap, good for summarization)
+ *
+ * Default model: claude-haiku-4-5 ($1/$5 per Mtok). Each briefing makes one
+ * short call per email — classify, summarize, draft a reply — which is squarely
+ * Haiku work, and it is the whole cost of running Aurora (~40 calls a day vs
+ * one for the overall summary). Sonnet 4.6, the previous default, costs 3x the
+ * same work. If the ownership/delegation judgement starts slipping, set the
+ * AI_MODEL Script Property to 'claude-sonnet-5' ($2/$10).
  */
 
-var CLAUDE_DEFAULT_MODEL = 'claude-sonnet-4-6';
+var CLAUDE_DEFAULT_MODEL = 'claude-haiku-4-5';
 var CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 var CLAUDE_API_VERSION = '2023-06-01';
+
+// Models that removed the sampling parameters — sending `temperature` to one of
+// these is a 400, so it is dropped for them.
+var CLAUDE_NO_TEMPERATURE = /^claude-(opus-5|opus-4-7|opus-4-8|sonnet-5|fable-|mythos-)/;
 
 /**
  * @param {string} apiKey
@@ -22,11 +32,14 @@ function callClaude(apiKey, prompt, opts, modelOverride) {
   var payload = {
     model: model,
     max_tokens: opts.maxTokens,
-    temperature: opts.temperature,
     messages: [
       { role: 'user', content: prompt }
     ],
   };
+
+  if (!CLAUDE_NO_TEMPERATURE.test(model)) {
+    payload.temperature = opts.temperature;
+  }
 
   if (opts.systemPrompt) {
     payload.system = opts.systemPrompt;

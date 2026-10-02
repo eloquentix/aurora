@@ -21,11 +21,19 @@ function runBriefing() {
   }
 
   var cfg = getConfig();
-  Logger.log('Aurora starting. Provider: ' + cfg.AI_PROVIDER + ', scanning last ' + cfg.HOURS_BACK + 'h');
 
-  // 2. Fetch recent emails and calendar events
+  // The watermark is the START of this run, saved only if we get all the way to
+  // a sent briefing. A run that throws leaves it alone, so the next run picks
+  // up everything this one would have covered.
+  var runEpoch = nowEpoch();
+  var win = computeScanWindow(cfg, runEpoch);
+  Logger.log('Aurora starting. Provider: ' + cfg.AI_PROVIDER + ', scanning ' + win.label +
+             ' (' + win.hours + 'h' + (win.fromLastRun ? ', from last run' : '') +
+             (win.capped ? ', capped at MAX_LOOKBACK_HOURS' : '') + ')');
+
+  // 2. Fetch emails in the window and today's calendar events
   var me = Session.getActiveUser().getEmail().toLowerCase();
-  var emails = fetchRecentEmails(cfg.HOURS_BACK, cfg.MAX_EMAILS, cfg.GMAIL_SEARCH);
+  var emails = fetchRecentEmails(win, cfg.MAX_EMAILS, cfg.GMAIL_SEARCH);
   Logger.log('Fetched ' + emails.length + ' emails');
 
   // Filter out Aurora's own briefing emails (self-flagging prevention)
@@ -44,11 +52,12 @@ function runBriefing() {
   Logger.log('Sent context: ' + sentContext.length + ' messages from last ' + cfg.SENT_CONTEXT_DAYS + 'd');
 
   if (emails.length === 0) {
-    var otherCount = countNonPrimaryEmails(cfg.HOURS_BACK);
+    var otherCount = countNonPrimaryEmails(win);
     var emptyMsg = otherCount > 0
       ? 'Nothing important. ' + otherCount + ' other email' + (otherCount !== 1 ? 's' : '') + ' arrived (promotions, notifications) — nothing that needs you.'
-      : 'Inbox is clear. Nothing new in the last ' + cfg.HOURS_BACK + ' hours.';
+      : 'Inbox is clear. Nothing new ' + win.label + '.';
     sendBriefingEmail(emptyMsg, [], calendarEvents, cfg);
+    setLastRunEpoch(runEpoch);
     Logger.log('Empty inbox briefing sent. (' + otherCount + ' non-primary skipped)');
     return;
   }
@@ -89,6 +98,9 @@ function runBriefing() {
   // 8. Build and send the briefing email
   sendBriefingEmail(overallSummary, analyses, calendarEvents, cfg);
 
+  // 9. Only now is the window actually covered.
+  setLastRunEpoch(runEpoch);
+
   Logger.log('Briefing sent. ' + analyses.length + ' emails processed.');
 }
 
@@ -96,6 +108,9 @@ function runBriefing() {
  * Test mode: runs the pipeline on the last 4 hours (max 5 emails) and
  * sends a real briefing email so you can see exactly what it looks like.
  * Check your inbox and the Execution Log after running.
+ *
+ * Deliberately does NOT touch the last-run watermark — a test must never make
+ * the next real briefing skip emails.
  */
 function testBriefing() {
   var errors = validateConfig();
@@ -107,7 +122,9 @@ function testBriefing() {
   Logger.log('=== TEST MODE: scanning last 4 hours, max 5 emails ===');
 
   var testHours = 4;
-  var emails = fetchRecentEmails(testHours, 5, cfg.GMAIL_SEARCH);
+  var win = { sinceEpoch: nowEpoch() - testHours * 3600, hours: testHours,
+              label: 'the last ' + testHours + ' hours', fromLastRun: false, capped: false };
+  var emails = fetchRecentEmails(win, 5, cfg.GMAIL_SEARCH);
   Logger.log('Found ' + emails.length + ' emails');
 
   var calendarEvents = fetchTodayEvents();
@@ -117,7 +134,7 @@ function testBriefing() {
   Logger.log('Sent context: ' + sentContext.length + ' messages');
 
   if (emails.length === 0) {
-    var otherCount = countNonPrimaryEmails(testHours);
+    var otherCount = countNonPrimaryEmails(win);
     var emptyMsg = otherCount > 0
       ? 'Nothing important. ' + otherCount + ' other email' + (otherCount !== 1 ? 's' : '') + ' arrived (promotions, notifications) — nothing that needs you.'
       : 'Inbox is clear. Nothing new in the last ' + testHours + ' hours.';

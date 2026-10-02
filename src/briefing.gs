@@ -25,6 +25,8 @@ var COLORS = {
   actionBorder:  '#d4a574',
   fyiBg:         '#ffffff',
   fyiBorder:     '#e0d5c5',
+  waitingBg:     '#f7f5f9',
+  waitingBorder: '#c9c0d4',
   replyBg:       '#f5f0e8',
   errorBg:       '#fce8e6',
   calendarBg:    '#f5f0e8',
@@ -45,15 +47,19 @@ var FONT_BODY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-ser
  * @returns {string}  HTML string
  */
 function buildBriefingHTML(overallSummary, analyses, calendarEvents, cfg) {
-  // Split analyses into buckets
+  // Split analyses into buckets. An "action" email whose owner is someone else
+  // is something we are WAITING on, not something to do — it gets its own
+  // section so the action list stays things the user personally owes.
   var actionEmails = [];
+  var waitingEmails = [];
   var fyiEmails = [];
   var skipCount = 0;
   var skipReasons = {};
 
   analyses.forEach(function(a) {
     if (a.category === 'action') {
-      actionEmails.push(a);
+      if (a.owner === 'someone_else') waitingEmails.push(a);
+      else actionEmails.push(a);
     } else if (a.category === 'skip') {
       skipCount++;
       var reason = a.skipReason || 'other';
@@ -71,6 +77,7 @@ function buildBriefingHTML(overallSummary, analyses, calendarEvents, cfg) {
     buildAugurSection(cfg),
     buildDivider(),
     actionEmails.length > 0 ? buildActionSection(actionEmails) : '',
+    waitingEmails.length > 0 ? buildWaitingSection(waitingEmails) : '',
     fyiEmails.length > 0 ? buildFyiSection(fyiEmails) : '',
     skipCount > 0 ? buildSkipLine(skipCount, skipReasons) : '',
     buildFooter(cfg),
@@ -197,6 +204,65 @@ function buildActionSection(actionEmails) {
     buildSectionHeadline('Requires Your Attention (' + actionEmails.length + ')'),
     '</div>',
     cards,
+  ].join('');
+}
+
+/**
+ * Waiting-on-others section — work the user has already handed off.
+ *
+ * These used to land in "Requires Your Attention", which meant Aurora kept
+ * telling the user to do things they had asked someone else to do.
+ */
+function buildWaitingSection(waitingEmails) {
+  var html = [
+    buildDivider(),
+    '<div style="padding-left:4px;margin-bottom:8px">',
+    buildSectionHeadline('Waiting on Others (' + waitingEmails.length + ')'),
+    '</div>',
+  ];
+
+  waitingEmails.forEach(function(a) {
+    html.push(buildWaitingCard(a));
+  });
+
+  return html.join('');
+}
+
+/**
+ * Waiting card — who owes what, no proposed reply.
+ */
+function buildWaitingCard(analysis) {
+  var email = analysis.email;
+
+  var whoHtml = analysis.waitingOn
+    ? '<div style="font-size:12px;color:' + COLORS.accentLight + ';margin-top:6px">' +
+      'Waiting on ' + escapeHtml(analysis.waitingOn) + '</div>'
+    : '';
+
+  var itemsHtml = '';
+  if (analysis.actionItems && analysis.actionItems.length > 0) {
+    itemsHtml = '<div style="margin-top:6px">' + analysis.actionItems.map(function(item) {
+      return '<div style="margin-bottom:3px;font-size:13px;color:' + COLORS.text + '">&bull; ' +
+             escapeHtml(item) + '</div>';
+    }).join('') + '</div>';
+  }
+
+  return [
+    '<div style="background:' + COLORS.waitingBg + ';border:1px solid ' + COLORS.waitingBorder + ';',
+    'border-radius:6px;padding:12px 18px;margin:8px 0">',
+    '<a href="' + email.gmailUrl + '" style="color:' + COLORS.headline + ';text-decoration:none;',
+    'font-family:' + FONT_HEADLINE + ';font-size:15px;font-weight:600">',
+    escapeHtml(email.subject),
+    '</a>',
+    '<div style="color:' + COLORS.textMuted + ';font-size:12px;margin-top:2px">',
+    escapeHtml(email.sender) + ' &nbsp;&middot;&nbsp; ' + escapeHtml(email.date),
+    '</div>',
+    '<div style="color:' + COLORS.text + ';font-size:14px;line-height:1.6;margin-top:8px">',
+    escapeHtml(analysis.summary),
+    '</div>',
+    itemsHtml,
+    whoHtml,
+    '</div>',
   ].join('');
 }
 
@@ -463,8 +529,10 @@ function buildBriefingPlainText(overallSummary, analyses, calendarEvents) {
   lines.push(overallSummary);
   lines.push('');
 
-  // Action emails
-  var actionEmails = analyses.filter(function(a) { return a.category === 'action'; });
+  // Action emails — only the ones the user personally owes
+  var actionEmails = analyses.filter(function(a) {
+    return a.category === 'action' && a.owner !== 'someone_else';
+  });
   if (actionEmails.length > 0) {
     lines.push('REQUIRES YOUR ATTENTION (' + actionEmails.length + ')');
     lines.push('------------------------------------------');
@@ -481,6 +549,27 @@ function buildBriefingPlainText(overallSummary, analyses, calendarEvents) {
         lines.push('Proposed reply:');
         lines.push(a.proposedReply);
       }
+      lines.push(a.email.gmailUrl);
+    });
+    lines.push('');
+  }
+
+  // Waiting on others
+  var waitingEmails = analyses.filter(function(a) {
+    return a.category === 'action' && a.owner === 'someone_else';
+  });
+  if (waitingEmails.length > 0) {
+    lines.push('WAITING ON OTHERS (' + waitingEmails.length + ')');
+    lines.push('------------------------------------------');
+    waitingEmails.forEach(function(a) {
+      lines.push('');
+      lines.push(a.email.subject);
+      lines.push(a.email.sender + ' · ' + a.email.date);
+      lines.push(a.summary);
+      if (a.actionItems && a.actionItems.length > 0) {
+        a.actionItems.forEach(function(item) { lines.push('• ' + item); });
+      }
+      if (a.waitingOn) lines.push('Waiting on ' + a.waitingOn);
       lines.push(a.email.gmailUrl);
     });
     lines.push('');

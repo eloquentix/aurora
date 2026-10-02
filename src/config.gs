@@ -13,12 +13,21 @@ var CONFIG = {
   // Which AI provider to use: 'claude' | 'openai' | 'gemini' | 'grok'
   AI_PROVIDER: 'claude',
 
-  // Override the default model for the chosen provider (null = use default)
-  // e.g. 'claude-opus-4-6', 'gpt-4o', 'gemini-2.0-flash', 'grok-3'
+  // Override the default model for the chosen provider (null = use default).
+  // Defaults are picked for cost: this is ~40 short calls a day, so the cheapest
+  // capable model wins. Claude -> claude-haiku-4-5 ($1/$5 per Mtok).
+  // Step up with 'claude-sonnet-5' if summaries or delegation calls get sloppy.
   AI_MODEL: null,
 
-  // How many hours back to scan the inbox
+  // How many hours back to scan the inbox when there is no last-run stamp
+  // (first run, or after clearing LAST_RUN_EPOCH). Normal runs scan from the
+  // end of the previous successful run instead — see MAX_LOOKBACK_HOURS.
   HOURS_BACK: 20,
+
+  // Hard cap on the scan window. If the last successful run was longer ago
+  // than this (trigger disabled, quota outage, vacation), scan only this far
+  // back rather than hundreds of emails.
+  MAX_LOOKBACK_HOURS: 96,
 
   // Maximum number of emails to process (prevents runaway API costs)
   // Gemini free tier: 10 req/min — at 6s delay, 25 emails takes ~2.5 min (safe)
@@ -78,6 +87,7 @@ function getConfig() {
   if (props.AI_PROVIDER) cfg.AI_PROVIDER = props.AI_PROVIDER.trim().toLowerCase();
   if (props.AI_MODEL)    cfg.AI_MODEL    = props.AI_MODEL.trim();
   if (props.HOURS_BACK)  cfg.HOURS_BACK  = parseInt(props.HOURS_BACK, 10);
+  if (props.MAX_LOOKBACK_HOURS) cfg.MAX_LOOKBACK_HOURS = parseInt(props.MAX_LOOKBACK_HOURS, 10);
   if (props.MAX_EMAILS)  cfg.MAX_EMAILS  = parseInt(props.MAX_EMAILS, 10);
   if (props.SENT_CONTEXT_DAYS !== undefined) cfg.SENT_CONTEXT_DAYS = parseInt(props.SENT_CONTEXT_DAYS, 10) || 0;
   if (props.SENT_CONTEXT_MAX) cfg.SENT_CONTEXT_MAX = parseInt(props.SENT_CONTEXT_MAX, 10);
@@ -171,6 +181,10 @@ function validateConfig() {
 
   if (isNaN(cfg.HOURS_BACK) || cfg.HOURS_BACK < 1) {
     errors.push('HOURS_BACK must be a positive number.');
+  }
+
+  if (isNaN(cfg.MAX_LOOKBACK_HOURS) || cfg.MAX_LOOKBACK_HOURS < cfg.HOURS_BACK) {
+    errors.push('MAX_LOOKBACK_HOURS must be a number >= HOURS_BACK.');
   }
 
   return errors;

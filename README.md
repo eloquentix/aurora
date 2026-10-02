@@ -69,7 +69,7 @@ Pick one — or switch anytime by changing a single config value.
 
 | Provider | Model | Free Tier |
 |----------|-------|-----------|
-| **Claude** (Anthropic) | `claude-sonnet-4-6` | No — [get key](https://console.anthropic.com) |
+| **Claude** (Anthropic) | `claude-haiku-4-5` | No — [get key](https://console.anthropic.com) |
 | **OpenAI** | `gpt-4o` | No — [get key](https://platform.openai.com) |
 | **Gemini** (Google) | `gemini-2.5-flash` | **Yes** — [get key](https://aistudio.google.com) |
 | **Grok** (xAI) | `grok-3` | No — [get key](https://console.x.ai) |
@@ -183,8 +183,11 @@ Edit `src/config.gs` or set Script Properties to override without touching code.
 | Key | Default | Description |
 |-----|---------|-------------|
 | `AI_PROVIDER` | `claude` | Active provider: `claude`, `openai`, `gemini`, `grok` |
-| `AI_MODEL` | *(provider default)* | Override model, e.g. `gpt-4o`, `claude-opus-4-6` |
-| `HOURS_BACK` | `20` | Hours of inbox to scan |
+| `AI_MODEL` | *(provider default)* | Override model, e.g. `claude-sonnet-5`, `gpt-4o` |
+| `HOURS_BACK` | `20` | Hours to scan on the FIRST run only; later runs scan from the last successful briefing |
+| `MAX_LOOKBACK_HOURS` | `96` | Hard cap on the scan window after a long gap |
+| `SENT_CONTEXT_DAYS` | `5` | Days of your own sent mail fed to the AI as context (`0` = off) |
+| `SENT_CONTEXT_MAX` | `40` | Cap on sent messages used as context |
 | `MAX_EMAILS` | `50` | Cap per run (controls cost) |
 | `BRIEFING_HOUR` | `7` | Hour to send the briefing (0–23) |
 | `PRIORITY_CONTACTS` | *(empty)* | Comma-separated emails to highlight at the top |

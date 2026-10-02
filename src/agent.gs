@@ -29,6 +29,19 @@ var SYSTEM_PROMPT = [
   '- "system": Security alerts, device notifications, service confirmations, automated reports.',
   '- "other": Anything else.',
   '',
+  'OWNERSHIP — WHO OWES THE WORK (the "owner" field):',
+  '- "you": the user personally has to do or decide something. Only these belong in their action list.',
+  '- "someone_else": the work sits with another person. The user is waiting, not working.',
+  '  This includes: the user already asked/delegated it (see the thread and the recent sent mail),',
+  '  someone promised to send or do something, or a colleague owns the next step.',
+  '- "unclear": genuinely cannot tell from the email.',
+  '- Before you call anything an action for the user, ask: did the USER already hand this off?',
+  '  A request the user made of someone else is that person\'s task, never the user\'s.',
+  '- When owner is "someone_else", set waitingOn to who owes it (name or email as written in the email),',
+  '  and phrase actionItems as what THEY owe ("Nata to send the signed contract"), not as the user\'s to-do.',
+  '  Do NOT invent a chase-up task for the user unless the email itself is overdue or blocking.',
+  '- Every actionItem under owner "you" must be something the user does with their own hands.',
+  '',
   'REPLY RULES:',
   '- Only propose a reply for "action" emails where a human reply is clearly expected.',
   '- Match the LANGUAGE of the original email. Romanian stays Romanian. English stays English. Never translate.',
@@ -38,6 +51,7 @@ var SYSTEM_PROMPT = [
   '- Be concise. 1-3 sentences max. Get to the point.',
   '- If the email is part of a thread, acknowledge context from earlier messages.',
   '- proposedReply must be null for "fyi" and "skip" emails.',
+  '- proposedReply must be null when owner is "someone_else" — the user is not the one who owes a response.',
   '',
   'CONTEXT AWARENESS:',
   '- The "To:" and "CC:" fields tell you who the email is addressed to.',
@@ -52,7 +66,9 @@ var SYSTEM_PROMPT = [
   '- "Recent sent mail" lists what the user wrote in the last few days. Use it to:',
   '  (a) read incoming messages as replies to the user\'s earlier requests when subjects/people match,',
   '  (b) NOT flag as "action" something the user has already answered or handled,',
-  '  (c) avoid proposing a reply that repeats what the user already said.',
+  '  (c) avoid proposing a reply that repeats what the user already said,',
+  '  (d) spot DELEGATION: anything the user asked another person to do there is owned by that person.',
+  '      If this email is about such a request, owner is "someone_else" and waitingOn is that person.',
   '- If a calendar invite already exists for something discussed in the email, the action may already be resolved.',
   '- For long threads, the threadContext shows prior messages. Use it to understand the conversation arc.',
   '',
@@ -77,6 +93,8 @@ var SYSTEM_PROMPT = [
  * @property {string|null}  proposedReply  Draft reply (null unless action)
  * @property {string|null}  skipReason     Why skipped (null if not skip)
  * @property {string}       fyiCategory    'finance' | 'team' | 'system' | 'other'
+ * @property {string}       owner          'you' | 'someone_else' | 'unclear'
+ * @property {string|null}  waitingOn      Who owes the work (null unless owner is someone_else)
  * @property {boolean}      error          true if AI call failed
  */
 function analyzeEmail(emailData, sentContext) {
@@ -99,6 +117,8 @@ function analyzeEmail(emailData, sentContext) {
       proposedReply: null,
       skipReason: 'error',
       fyiCategory: 'other',
+      owner: 'unclear',
+      waitingOn: null,
       error: true,
     };
   }
@@ -115,6 +135,8 @@ function analyzeEmail(emailData, sentContext) {
       proposedReply: null,
       skipReason: 'error',
       fyiCategory: 'other',
+      owner: 'unclear',
+      waitingOn: null,
       error: true,
     };
   }
@@ -125,16 +147,44 @@ function analyzeEmail(emailData, sentContext) {
   var fyiCategory = parsed.fyiCategory || 'other';
   if (['finance', 'team', 'system', 'other'].indexOf(fyiCategory) === -1) fyiCategory = 'other';
 
+  var owner = parsed.owner || 'unclear';
+  if (['you', 'someone_else', 'unclear'].indexOf(owner) === -1) owner = 'unclear';
+
+  // The user wrote the latest message to other people — whatever it asks for,
+  // they are not the one who owes it. The model gets this right most of the
+  // time now, but the header is hard evidence, so don't leave it to chance.
+  if (emailData.recipientRole === 'sent') owner = 'someone_else';
+
+  var delegated = owner === 'someone_else';
+
   return {
     email: emailData,
     category: category,
     summary: parsed.summary || '',
     actionItems: Array.isArray(parsed.actionItems) ? parsed.actionItems : [],
-    proposedReply: category === 'action' ? (parsed.proposedReply || null) : null,
+    // No reply to draft when the ball is in someone else's court.
+    proposedReply: (category === 'action' && !delegated) ? (parsed.proposedReply || null) : null,
     skipReason: parsed.skipReason || null,
     fyiCategory: fyiCategory,
+    owner: owner,
+    waitingOn: delegated ? (parsed.waitingOn || inferWaitingOn(emailData)) : null,
     error: false,
   };
+}
+
+/**
+ * Fallback for who we're waiting on when the model didn't name anyone.
+ * For a message the user sent, that's the To: line; otherwise the sender.
+ *
+ * @param {EmailData} emailData
+ * @returns {string|null}
+ */
+function inferWaitingOn(emailData) {
+  if (emailData.recipientRole === 'sent' && emailData.toRecipients) {
+    var first = emailData.toRecipients.split(',')[0];
+    return extractDisplayName(first) || extractEmailAddress(first) || null;
+  }
+  return emailData.sender || null;
 }
 
 /**
@@ -149,17 +199,25 @@ function generateOverallSummary(analyses, calendarEvents, sentContext) {
     return 'Inbox is clear. Nothing new.';
   }
 
-  var actionCount = 0, fyiCount = 0, skipCount = 0;
+  var actionCount = 0, waitingCount = 0, fyiCount = 0, skipCount = 0;
   analyses.forEach(function(a) {
-    if (a.category === 'action') actionCount++;
-    else if (a.category === 'fyi') fyiCount++;
+    if (a.category === 'action') {
+      if (a.owner === 'someone_else') waitingCount++;
+      else actionCount++;
+    } else if (a.category === 'fyi') fyiCount++;
     else skipCount++;
   });
 
   // Build rich context for the AI
   var actionSummaries = analyses
-    .filter(function(a) { return a.category === 'action'; })
+    .filter(function(a) { return a.category === 'action' && a.owner !== 'someone_else'; })
     .map(function(a) { return '- ' + a.email.sender + ': ' + a.summary; });
+
+  var waitingSummaries = analyses
+    .filter(function(a) { return a.category === 'action' && a.owner === 'someone_else'; })
+    .map(function(a) {
+      return '- ' + (a.waitingOn ? a.waitingOn + ' owes: ' : '') + a.summary;
+    });
 
   var fyiHighlights = analyses
     .filter(function(a) { return a.category === 'fyi'; })
@@ -176,9 +234,13 @@ function generateOverallSummary(analyses, calendarEvents, sentContext) {
   var sentBlock = formatSentContext(sentContext);
 
   var prompt = [
-    'Email stats: ' + actionCount + ' need attention, ' + fyiCount + ' FYI, ' + skipCount + ' skipped.',
+    'Email stats: ' + actionCount + ' need attention, ' + waitingCount + ' waiting on others, ' +
+      fyiCount + ' FYI, ' + skipCount + ' skipped.',
     '',
-    actionCount > 0 ? 'Emails needing action:\n' + actionSummaries.join('\n') : 'No emails need action.',
+    actionCount > 0 ? 'Emails needing action FROM YOU:\n' + actionSummaries.join('\n') : 'Nothing needs action from you.',
+    '',
+    waitingSummaries.length > 0 ? 'Owed BY OTHER PEOPLE (you are waiting, do not tell me to do these):\n' +
+      waitingSummaries.join('\n') : '',
     '',
     fyiHighlights.length > 0 ? 'FYI highlights:\n' + fyiHighlights.join('\n') : '',
     calendarContext,
@@ -191,6 +253,7 @@ function generateOverallSummary(analyses, calendarEvents, sentContext) {
     'Mention the first meeting of the day if there is one.',
     'Mention any deadlines or time-sensitive items.',
     'If you asked someone for something recently (see sent mail) and no reply has arrived, mention it as "still waiting on X".',
+    'Never phrase something another person owes as a task for me. "Nata still owes the contract" — not "send the contract".',
     'Be direct, specific, and concise. No filler. No bullet points — just flowing prose.',
   ].join('\n');
 
@@ -281,7 +344,9 @@ function buildAnalysisPrompt(emailData, sentContext) {
   parts.push('  "actionItems": ["specific action needed"] or [],');
   parts.push('  "proposedReply": "draft reply text" or null,');
   parts.push('  "skipReason": "newsletter" | "promo" | "notification" | "system" | "error" or null,');
-  parts.push('  "fyiCategory": "finance" | "team" | "system" | "other"');
+  parts.push('  "fyiCategory": "finance" | "team" | "system" | "other",');
+  parts.push('  "owner": "you" | "someone_else" | "unclear",');
+  parts.push('  "waitingOn": "who owes the work" or null');
   parts.push('}');
   parts.push('');
   parts.push('Rules:');
@@ -289,6 +354,8 @@ function buildAnalysisPrompt(emailData, sentContext) {
   parts.push('- proposedReply ONLY for "action" emails. Must match the language of the original.');
   parts.push('- actionItems must be empty [] for "fyi" and "skip" emails.');
   parts.push('- fyiCategory is REQUIRED for all emails (used for grouping in the briefing).');
+  parts.push('- owner is REQUIRED. Use "someone_else" whenever the user already asked another person');
+  parts.push('  for this, or another person owes the next step. waitingOn must name them.');
   parts.push('- Return only the JSON — no markdown fences, no explanation.');
 
   return parts.join('\n');
@@ -330,6 +397,13 @@ function verifyBriefing(overallSummary, analyses) {
     // Proposed reply contains JSON
     if (a.proposedReply && a.proposedReply.indexOf('"category"') !== -1) {
       a.proposedReply = null;
+    }
+    // Ownership coherence: a delegated item has no reply for the user to send,
+    // and a self-owned item should not claim we're waiting on anyone.
+    if (a.owner === 'someone_else') {
+      a.proposedReply = null;
+    } else {
+      a.waitingOn = null;
     }
   });
 
